@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Đang xử lý yêu cầu...</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding-top: 100px; }
+    #status { font-size: 1.4em; margin-top: 20px; }
+    .loader {
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid #3498db;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <h2>⏳ Đang xử lý yêu cầu...</h2>
+  <div class="loader"></div>
+  <div id="status">Vui lòng chờ trong giây lát...</div>
+
+  <script>
+    async function callFlow() {
+      document.getElementById("status").textContent = "🚀 Gửi yêu cầu tới hệ thống...";
+
+      try {
+        const response = await fetch("https://prod-43.southeastasia.logic.azure.com:443/workflows/1649ab51f4154bdd9ae6d13f340786bf/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=U784B54C0Wa-1mGpqN4lkwN_oEY1X6v61KmtLff0t6s", {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ "source": "Power BI" }) // tuỳ chọn
+        });
+
+        if (!response.ok) throw new Error("HTTP error " + response.status);
+        const result = await response.json();
+
+        document.querySelector("h2").textContent = "✅ Hoàn tất!";
+        document.getElementById("status").textContent = result.message || "Yêu cầu đã được xử lý thành công.";
+        document.querySelector(".loader").style.display = "none";
+      } catch (error) {
+        document.querySelector("h2").textContent = "❌ Lỗi xảy ra";
+        document.getElementById("status").textContent = "Không thể xử lý yêu cầu: " + error;
+        document.querySelector(".loader").style.display = "none";
+      }
+    }
+
+    window.onload = callFlow;
+  </script>
+</body>
+</html>
