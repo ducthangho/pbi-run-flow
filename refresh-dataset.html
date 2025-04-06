@@ -37,7 +37,7 @@
       document.querySelector(".loader").style.display = "none";
     } else {
       const triggerUrl = `https://prod-59.southeastasia.logic.azure.com:443/workflows/2781bd2275954154805e1b5f76eb4285/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ILSAFGPG3OQxfBxw3kUhgOi3bBRRaLw3WqW_EdOyOZ8&groupId=${groupId}&datasetId=${datasetId}`;
-
+      console.log("Trigger URL : "+ triggerUrl);
       async function refreshDataset() {
         document.getElementById("status").textContent = "🚀 Đang gửi yêu cầu làm mới...";
 
