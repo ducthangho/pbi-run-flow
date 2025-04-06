@@ -31,6 +31,8 @@
     const params = new URLSearchParams(window.location.search);
     const groupId = params.get("groupId");
     const datasetId = params.get("datasetId");
+    console.log("groupId "+groupId);
+    console.log("datasetId "+datasetId);
 
     if (!groupId || !datasetId) {
       document.getElementById("status").textContent = "❌ Thiếu tham số groupId hoặc datasetId trong URL.";
