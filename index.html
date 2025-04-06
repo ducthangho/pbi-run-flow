@@ -82,10 +82,10 @@
 
         if (result.fileUrl) {
           const link = document.getElementById("fileLink");
-          const filename = result.filename || "";
+          const filename = result.Filename || "";
           const icon = getFileIcon(filename);
           link.href = result.fileUrl;
-          link.textContent = (filename.length <= 40 ? icon + " " + filename : icon + " Mở tệp kết quả");
+          link.textContent = (filename.length>0 && filename.length <= 40 ? icon + " Mở file " + filename : icon + " Mở file kết quả");
           link.style.display = "block";
         }
 
