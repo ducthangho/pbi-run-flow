@@ -126,4 +126,12 @@
       jsonBox.style.display = jsonBox.style.display === "none" ? "block" : "none";
     }
 
-    window.onload
+    window.onload = () => {
+      document.getElementById("status").textContent = "🚀 Gửi yêu cầu tới hệ thống...";
+      const url = "https://prod-43.southeastasia.logic.azure.com:443/workflows/1649ab51f4154bdd9ae6d13f340786bf/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=U784B54C0Wa-1mGpqN4lkwN_oEY1X6v61KmtLff0t6s&filters=" + filters;
+      callFlowWithTimeout(url);
+    };
+  </script>
+
+</body>
+</html>
