@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <title>Đang xử lý yêu cầu...</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding-top: 80px; padding-left: 20px; padding-right: 20px; }
-    #status { font-size: 1.2em; margin-top: 20px; }
+    body { font-family: Arial, sans-serif; text-align: center; padding-top: 100px; }
+    #status { font-size: 1.4em; margin-top: 20px; }
     .loader {
       border: 6px solid #f3f3f3;
       border-top: 6px solid #3498db;
@@ -13,53 +13,47 @@
       width: 50px;
       height: 50px;
       animation: spin 1s linear infinite;
-      margin: 20px auto;
+      margin: 0 auto;
     }
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
-    #fileLink {
-      display: block;
-      margin-top: 20px;
-      font-size: 1.1em;
-    }
-    #toggleJsonBtn {
-      margin-top: 20px;
-      cursor: pointer;
-      color: #007bff;
-      text-decoration: underline;
-    }
-    #resultJson {
-      margin-top: 20px;
-      padding: 10px;
-      border: 1px solid #ccc;
-      background: #f9f9f9;
-      text-align: left;
-      white-space: pre-wrap;
-      max-width: 800px;
-      margin-left: auto;
-      margin-right: auto;
-      display: none;
-    }
+    #fileLink { display: none; margin-top: 20px; font-size: 1.2em; text-decoration: none; color: #2c3e50; }
+    #fileLink:hover { text-decoration: underline; }
+    #showDetails { margin-top: 20px; cursor: pointer; color: #2980b9; text-decoration: underline; }
+    #resultDetails { display: none; white-space: pre-wrap; margin-top: 20px; text-align: left; padding: 10px; border: 1px solid #ccc; background: #f9f9f9; max-width: 800px; margin-left: auto; margin-right: auto; font-size: 0.9em; }
   </style>
 </head>
 <body>
-
   <h2>⏳ Đang xử lý yêu cầu...</h2>
   <div class="loader"></div>
   <div id="status">Vui lòng chờ trong giây lát...</div>
-  <a id="fileLink" href="#" target="_blank" style="display:none;"></a>
-  <div id="toggleJsonBtn" style="display:none;" onclick="toggleJson()">📄 Xem chi tiết kết quả</div>
-  <pre id="resultJson"></pre>
+  <a id="fileLink" href="#" target="_blank"></a>
+  <div id="showDetails" onclick="document.getElementById('resultDetails').style.display='block'; this.style.display='none';">Hiển thị chi tiết kết quả</div>
+  <div id="resultDetails"></div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
     const filters = params.get("filters") || "";
 
-    async function callFlowWithTimeout(url, timeout = 180000) {
+    function getFileIcon(filename) {
+      const extension = filename.split('.').pop().toLowerCase();
+      const icons = {
+        'xlsx': '📊', 'xls': '📊', 'docx': '📝', 'doc': '📝', 'pdf': '📄',
+        'pptx': '📽', 'ppt': '📽', 'txt': '📃', 'csv': '📑', 'zip': '🗜',
+        'rar': '🗜', 'jpg': '🖼', 'jpeg': '🖼', 'png': '🖼', 'gif': '🖼',
+        'mp3': '🎵', 'wav': '🎵', 'mp4': '🎥', 'avi': '🎥', 'mov': '🎥'
+      };
+      return icons[extension] || '📁';
+    }
+
+    async function callFlow() {
+      document.getElementById("status").textContent = "🚀 Gửi yêu cầu tới hệ thống...";
+      const url = "https://prod-43.southeastasia.logic.azure.com:443/workflows/1649ab51f4154bdd9ae6d13f340786bf/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=U784B54C0Wa-1mGpqN4lkwN_oEY1X6v61KmtLff0t6s&filters=" + encodeURIComponent(filters);
+
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeout);
+      const timeout = setTimeout(() => controller.abort(), 180000); // 3 phút
 
       try {
         const response = await fetch(url, {
@@ -68,7 +62,7 @@
           signal: controller.signal
         });
 
-        clearTimeout(timer);
+        clearTimeout(timeout);
 
         if (!response.ok) throw new Error("HTTP error " + response.status);
 
@@ -80,58 +74,32 @@
           result = { message: resultText };
         }
 
+        console.log("✅ Kết quả trả về:", result);
+
         document.querySelector("h2").textContent = "✅ Hoàn tất!";
         document.getElementById("status").textContent = result.message || "Yêu cầu đã được xử lý thành công.";
         document.querySelector(".loader").style.display = "none";
 
-        // Nếu có fileUrl thì hiển thị link
         if (result.fileUrl) {
           const link = document.getElementById("fileLink");
+          const filename = result.filename || "";
+          const icon = getFileIcon(filename);
           link.href = result.fileUrl;
-
-          const fname = result.filename || "";
-          let icon = "📄";
-          if (fname.toLowerCase().endsWith(".xlsx")) {
-            icon = "📊";
-          }
-
-          if (fname && fname.length <= 40) {
-            link.textContent = `${icon} ${fname}`;
-          } else {
-            link.textContent = `${icon} Mở file kết quả`;
-          }
-
+          link.textContent = (filename.length <= 40 ? icon + " " + filename : icon + " Mở tệp kết quả");
           link.style.display = "block";
         }
 
-        // Hiển thị nút xem chi tiết JSON
-        const toggleBtn = document.getElementById("toggleJsonBtn");
-        toggleBtn.style.display = "inline-block";
-
-        // Gán nội dung JSON
-        const jsonBox = document.getElementById("resultJson");
-        jsonBox.textContent = JSON.stringify(result, null, 2);
-
+        document.getElementById("resultDetails").textContent = JSON.stringify(result, null, 2);
       } catch (error) {
-        document.querySelector("h2").textContent = error.name === 'AbortError' ? "⏱ Quá thời gian chờ" : "❌ Lỗi xảy ra";
-        document.getElementById("status").textContent = error.name === 'AbortError'
-          ? "Không nhận được phản hồi từ hệ thống sau 3 phút."
-          : "Không thể xử lý yêu cầu: " + error.message;
+        document.querySelector("h2").textContent = "❌ Lỗi xảy ra";
+        document.getElementById("status").textContent = error.name === 'AbortError' ?
+          "Yêu cầu mất quá nhiều thời gian. Vui lòng thử lại sau." :
+          "Không thể xử lý yêu cầu: " + error.message;
         document.querySelector(".loader").style.display = "none";
       }
     }
 
-    function toggleJson() {
-      const jsonBox = document.getElementById("resultJson");
-      jsonBox.style.display = jsonBox.style.display === "none" ? "block" : "none";
-    }
-
-    window.onload = () => {
-      document.getElementById("status").textContent = "🚀 Gửi yêu cầu tới hệ thống...";
-      const url = "https://prod-43.southeastasia.logic.azure.com:443/workflows/1649ab51f4154bdd9ae6d13f340786bf/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=U784B54C0Wa-1mGpqN4lkwN_oEY1X6v61KmtLff0t6s&filters=" + filters;
-      callFlowWithTimeout(url);
-    };
+    window.onload = callFlow;
   </script>
-
 </body>
 </html>
