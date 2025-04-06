@@ -29,6 +29,7 @@
   <script>
     const params = new URLSearchParams(window.location.search);
     const filters = params.get("filters") || "";
+    console.log("FILTER = "+filters)
 
     async function callFlow() {
       document.getElementById("status").textContent = "🚀 Gửi yêu cầu tới hệ thống...";
