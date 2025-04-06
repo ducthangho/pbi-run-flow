@@ -2,9 +2,10 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Refresh Dataset</title>
+  <title>Đang làm mới dữ liệu Power BI...</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding-top: 80px; }
+    body { font-family: Arial, sans-serif; text-align: center; padding-top: 100px; }
+    #status { font-size: 1.3em; margin-top: 20px; }
     .loader {
       border: 6px solid #f3f3f3;
       border-top: 6px solid #3498db;
@@ -12,40 +13,69 @@
       width: 50px;
       height: 50px;
       animation: spin 1s linear infinite;
-      margin: 20px auto;
+      margin: 0 auto;
     }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
+
 <body>
   <h2>🔄 Đang làm mới dữ liệu Power BI...</h2>
   <div class="loader"></div>
-  <div id="status">Xin vui lòng chờ...</div>
+  <div id="status">Vui lòng chờ trong giây lát...</div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
     const groupId = params.get("groupId");
     const datasetId = params.get("datasetId");
 
-    const flowUrl = `https://prod-59.southeastasia.logic.azure.com:443/workflows/2781bd2275954154805e1b5f76eb4285/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ILSAFGPG3OQxfBxw3kUhgOi3bBRRaLw3WqW_EdOyOZ8&groupId=${groupId}&datasetId=${datasetId}`;
+    if (!groupId || !datasetId) {
+      document.getElementById("status").textContent = "❌ Thiếu tham số groupId hoặc datasetId trong URL.";
+      document.querySelector(".loader").style.display = "none";
+    } else {
+      const triggerUrl = `https://prod-59.southeastasia.logic.azure.com:443/workflows/2781bd2275954154805e1b5f76eb4285/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ILSAFGPG3OQxfBxw3kUhgOi3bBRRaLw3WqW_EdOyOZ8&groupId=${groupId}&datasetId=${datasetId}`;
 
-    async function refreshDataset() {
-      document.getElementById("status").textContent = "Gửi yêu cầu refresh Power BI dataset...";
+      async function refreshDataset() {
+        document.getElementById("status").textContent = "🚀 Đang gửi yêu cầu làm mới...";
 
-      try {
-        const response = await fetch(flowUrl, { method: "POST" });
-        if (!response.ok) throw new Error("Không thể gọi Power Automate");
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 180000); // ⏳ 3 phút timeout
 
-        const result = await response.json();
-        document.querySelector("h2").textContent = "✅ Hoàn tất!";
-        document.getElementById("status").textContent = result.message || "Dataset đã được refresh!";
-      } catch (error) {
-        document.querySelector("h2").textContent = "❌ Lỗi";
-        document.getElementById("status").textContent = "Không thể refresh: " + error.message;
+          const response = await fetch(triggerUrl, {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+            signal: controller.signal
+          });
+
+          clearTimeout(timeout);
+
+          if (!response.ok) throw new Error("Lỗi HTTP: " + response.status);
+
+          const resultText = await response.text();
+          let result;
+          try {
+            result = JSON.parse(resultText);
+          } catch (e) {
+            result = { message: resultText };
+          }
+
+          document.querySelector("h2").textContent = "✅ Làm mới thành công!";
+          document.getElementById("status").textContent = result.message || "Dataset đã được gửi yêu cầu làm mới.";
+          document.querySelector(".loader").style.display = "none";
+
+        } catch (err) {
+          document.querySelector("h2").textContent = "❌ Có lỗi xảy ra";
+          document.getElementById("status").textContent = "Không thể gửi yêu cầu làm mới: " + err.message;
+          document.querySelector(".loader").style.display = "none";
+        }
       }
-    }
 
-    window.onload = refreshDataset;
+      refreshDataset();
+    }
   </script>
 </body>
 </html>
