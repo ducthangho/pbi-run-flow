@@ -24,8 +24,14 @@
       margin-top: 20px;
       font-size: 1.1em;
     }
+    #toggleJsonBtn {
+      margin-top: 20px;
+      cursor: pointer;
+      color: #007bff;
+      text-decoration: underline;
+    }
     #resultJson {
-      margin-top: 30px;
+      margin-top: 20px;
       padding: 10px;
       border: 1px solid #ccc;
       background: #f9f9f9;
@@ -34,6 +40,7 @@
       max-width: 800px;
       margin-left: auto;
       margin-right: auto;
+      display: none;
     }
   </style>
 </head>
@@ -43,12 +50,12 @@
   <div class="loader"></div>
   <div id="status">Vui lòng chờ trong giây lát...</div>
   <a id="fileLink" href="#" target="_blank" style="display:none;"></a>
-  <pre id="resultJson" style="display:none;"></pre>
+  <div id="toggleJsonBtn" style="display:none;" onclick="toggleJson()">📄 Xem chi tiết kết quả</div>
+  <pre id="resultJson"></pre>
 
   <script>
     const params = new URLSearchParams(window.location.search);
     const filters = params.get("filters") || "";
-    console.log("FILTER = " + filters);
 
     async function callFlowWithTimeout(url, timeout = 180000) {
       const controller = new AbortController();
@@ -81,14 +88,23 @@
         if (result.fileUrl) {
           const link = document.getElementById("fileLink");
           link.href = result.fileUrl;
-          link.textContent = "📁 Mở file kết quả";
+
+          if (result.filename && result.filename.length <= 40) {
+            link.textContent = "📁 " + result.filename;
+          } else {
+            link.textContent = "📁 Mở file kết quả";
+          }
+
           link.style.display = "block";
         }
 
-        // Hiển thị toàn bộ nội dung kết quả (JSON)
+        // Hiển thị nút xem chi tiết JSON
+        const toggleBtn = document.getElementById("toggleJsonBtn");
+        toggleBtn.style.display = "inline-block";
+
+        // Gán nội dung JSON
         const jsonBox = document.getElementById("resultJson");
         jsonBox.textContent = JSON.stringify(result, null, 2);
-        jsonBox.style.display = "block";
 
       } catch (error) {
         document.querySelector("h2").textContent = error.name === 'AbortError' ? "⏱ Quá thời gian chờ" : "❌ Lỗi xảy ra";
@@ -97,6 +113,11 @@
           : "Không thể xử lý yêu cầu: " + error.message;
         document.querySelector(".loader").style.display = "none";
       }
+    }
+
+    function toggleJson() {
+      const jsonBox = document.getElementById("resultJson");
+      jsonBox.style.display = jsonBox.style.display === "none" ? "block" : "none";
     }
 
     window.onload = () => {
