@@ -50,6 +50,8 @@
         } catch (err) {
           result = { message: resultText }; // fallback nếu không phải JSON
         }
+
+        // Flow phải kết thúc bằng action 'Response'
         
         console.log("✅ Kết quả trả về:", result);
         
