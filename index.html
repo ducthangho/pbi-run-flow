@@ -33,20 +33,30 @@
 
     async function callFlow() {
       document.getElementById("status").textContent = "🚀 Gửi yêu cầu tới hệ thống...";
-
+      const url = "https://prod-43.southeastasia.logic.azure.com:443/workflows/1649ab51f4154bdd9ae6d13f340786bf/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=U784B54C0Wa-1mGpqN4lkwN_oEY1X6v61KmtLff0t6s&filters=" + filters;
+        
       try {
-        const url = "https://prod-43.southeastasia.logic.azure.com:443/workflows/1649ab51f4154bdd9ae6d13f340786bf/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=U784B54C0Wa-1mGpqN4lkwN_oEY1X6v61KmtLff0t6s&filters=" + filters;
         const response = await fetch(url, {
           method: "GET",
           headers: { "Content-Type": "application/json" }
         });
-
+        
         if (!response.ok) throw new Error("HTTP error " + response.status);
-        const result = await response.json();
-
+        
+        const resultText = await response.text(); // lấy raw text
+        let result;
+        try {
+          result = JSON.parse(resultText); // thử parse JSON
+        } catch (err) {
+          result = { message: resultText }; // fallback nếu không phải JSON
+        }
+        
+        console.log("✅ Kết quả trả về:", result);
+        
         document.querySelector("h2").textContent = "✅ Hoàn tất!";
         document.getElementById("status").textContent = result.message || "Yêu cầu đã được xử lý thành công.";
         document.querySelector(".loader").style.display = "none";
+
       } catch (error) {
         document.querySelector("h2").textContent = "❌ Lỗi xảy ra";
         document.getElementById("status").textContent = "Không thể xử lý yêu cầu: " + error.message;
