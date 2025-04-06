@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Refresh Dataset</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding-top: 80px; }
+    .loader {
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid #3498db;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <h2>🔄 Đang làm mới dữ liệu Power BI...</h2>
+  <div class="loader"></div>
+  <div id="status">Xin vui lòng chờ...</div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const groupId = params.get("groupId");
+    const datasetId = params.get("datasetId");
+
+    const flowUrl = `https://prod-59.southeastasia.logic.azure.com:443/workflows/2781bd2275954154805e1b5f76eb4285/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ILSAFGPG3OQxfBxw3kUhgOi3bBRRaLw3WqW_EdOyOZ8&groupId=${groupId}&datasetId=${datasetId}`;
+
+    async function refreshDataset() {
+      document.getElementById("status").textContent = "Gửi yêu cầu refresh Power BI dataset...";
+
+      try {
+        const response = await fetch(flowUrl, { method: "POST" });
+        if (!response.ok) throw new Error("Không thể gọi Power Automate");
+
+        const result = await response.json();
+        document.querySelector("h2").textContent = "✅ Hoàn tất!";
+        document.getElementById("status").textContent = result.message || "Dataset đã được refresh!";
+      } catch (error) {
+        document.querySelector("h2").textContent = "❌ Lỗi";
+        document.getElementById("status").textContent = "Không thể refresh: " + error.message;
+      }
+    }
+
+    window.onload = refreshDataset;
+  </script>
+</body>
+</html>
