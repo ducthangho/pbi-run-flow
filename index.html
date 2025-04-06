@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <title>Đang xử lý yêu cầu...</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding-top: 100px; }
-    #status { font-size: 1.4em; margin-top: 20px; }
+    body { font-family: Arial, sans-serif; text-align: center; padding-top: 80px; padding-left: 20px; padding-right: 20px; }
+    #status { font-size: 1.2em; margin-top: 20px; }
     .loader {
       border: 6px solid #f3f3f3;
       border-top: 6px solid #3498db;
@@ -13,60 +13,98 @@
       width: 50px;
       height: 50px;
       animation: spin 1s linear infinite;
-      margin: 0 auto;
+      margin: 20px auto;
     }
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+    #fileLink {
+      display: block;
+      margin-top: 20px;
+      font-size: 1.1em;
+    }
+    #resultJson {
+      margin-top: 30px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      background: #f9f9f9;
+      text-align: left;
+      white-space: pre-wrap;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
   </style>
 </head>
 <body>
+
   <h2>⏳ Đang xử lý yêu cầu...</h2>
   <div class="loader"></div>
   <div id="status">Vui lòng chờ trong giây lát...</div>
+  <a id="fileLink" href="#" target="_blank" style="display:none;"></a>
+  <pre id="resultJson" style="display:none;"></pre>
 
   <script>
     const params = new URLSearchParams(window.location.search);
     const filters = params.get("filters") || "";
-    console.log("FILTER = "+filters)
+    console.log("FILTER = " + filters);
 
-    async function callFlow() {
-      document.getElementById("status").textContent = "🚀 Gửi yêu cầu tới hệ thống...";
-      const url = "https://prod-43.southeastasia.logic.azure.com:443/workflows/1649ab51f4154bdd9ae6d13f340786bf/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=U784B54C0Wa-1mGpqN4lkwN_oEY1X6v61KmtLff0t6s&filters=" + filters;
-        
+    async function callFlowWithTimeout(url, timeout = 180000) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeout);
+
       try {
         const response = await fetch(url, {
           method: "GET",
-          headers: { "Content-Type": "application/json" }
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal
         });
-        
+
+        clearTimeout(timer);
+
         if (!response.ok) throw new Error("HTTP error " + response.status);
-        
-        const resultText = await response.text(); // lấy raw text
+
+        const resultText = await response.text();
         let result;
         try {
-          result = JSON.parse(resultText); // thử parse JSON
+          result = JSON.parse(resultText);
         } catch (err) {
-          result = { message: resultText }; // fallback nếu không phải JSON
+          result = { message: resultText };
         }
 
-        // Flow phải kết thúc bằng action 'Response'
-        
-        console.log("✅ Kết quả trả về:", result);
-        
         document.querySelector("h2").textContent = "✅ Hoàn tất!";
         document.getElementById("status").textContent = result.message || "Yêu cầu đã được xử lý thành công.";
         document.querySelector(".loader").style.display = "none";
 
+        // Nếu có fileUrl thì hiển thị link
+        if (result.fileUrl) {
+          const link = document.getElementById("fileLink");
+          link.href = result.fileUrl;
+          link.textContent = "📁 Mở file kết quả";
+          link.style.display = "block";
+        }
+
+        // Hiển thị toàn bộ nội dung kết quả (JSON)
+        const jsonBox = document.getElementById("resultJson");
+        jsonBox.textContent = JSON.stringify(result, null, 2);
+        jsonBox.style.display = "block";
+
       } catch (error) {
-        document.querySelector("h2").textContent = "❌ Lỗi xảy ra";
-        document.getElementById("status").textContent = "Không thể xử lý yêu cầu: " + error.message;
+        document.querySelector("h2").textContent = error.name === 'AbortError' ? "⏱ Quá thời gian chờ" : "❌ Lỗi xảy ra";
+        document.getElementById("status").textContent = error.name === 'AbortError'
+          ? "Không nhận được phản hồi từ hệ thống sau 3 phút."
+          : "Không thể xử lý yêu cầu: " + error.message;
         document.querySelector(".loader").style.display = "none";
       }
     }
 
-    window.onload = callFlow;
+    window.onload = () => {
+      document.getElementById("status").textContent = "🚀 Gửi yêu cầu tới hệ thống...";
+      const url = "https://prod-43.southeastasia.logic.azure.com:443/workflows/1649ab51f4154bdd9ae6d13f340786bf/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=U784B54C0Wa-1mGpqN4lkwN_oEY1X6v61KmtLff0t6s&filters=" + filters;
+      callFlowWithTimeout(url);
+    };
   </script>
+
 </body>
 </html>
