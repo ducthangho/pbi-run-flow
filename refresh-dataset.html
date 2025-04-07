@@ -45,7 +45,7 @@
 
         try {
           const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 180000); // ⏳ 3 phút timeout
+          const timeout = setTimeout(() => controller.abort(), 600000); // ⏳ 10 phút timeout
 
           const response = await fetch(triggerUrl, {
             method: "GET",
