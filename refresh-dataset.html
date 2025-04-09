@@ -36,7 +36,7 @@
     console.log("groupIdForRefreshDataflow "+groupIdForRefreshDataflow);
     console.log("dataflowIdForRefreshDataflow "+dataflowIdForRefreshDataflow);
 
-    if (!groupId || !datasetId) {
+    if (!groupIdForRefreshDataflow || !dataflowIdForRefreshDataflow) {
       document.getElementById("status").textContent = "❌ Thiếu tham số groupId hoặc datasetId trong URL.";
       document.querySelector(".loader").style.display = "none";
     } else {
