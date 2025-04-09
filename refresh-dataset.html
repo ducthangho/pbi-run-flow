@@ -29,16 +29,18 @@
 
   <script>
     const params = new URLSearchParams(window.location.search);
-    const groupId = params.get("groupId");
-    const datasetId = params.get("datasetId");
-    console.log("groupId "+groupId);
-    console.log("datasetId "+datasetId);
+    workspaceType=Workspace&groupIdForRefreshDataflow=18269ca7-1e85-446b-b101-9248e91a9a3c&dataflowIdForRefreshDataflow=360058d0-3807-4671-942d-e2e6fb3bd996"
+    const workspaceType = params.get("workspaceType");
+    const groupIdForRefreshDataflow = params.get("groupIdForRefreshDataflow");
+    const dataflowIdForRefreshDataflow = params.get("dataflowIdForRefreshDataflow");
+    console.log("groupIdForRefreshDataflow "+groupIdForRefreshDataflow);
+    console.log("dataflowIdForRefreshDataflow "+dataflowIdForRefreshDataflow);
 
     if (!groupId || !datasetId) {
       document.getElementById("status").textContent = "❌ Thiếu tham số groupId hoặc datasetId trong URL.";
       document.querySelector(".loader").style.display = "none";
     } else {
-      const triggerUrl = `https://prod-59.southeastasia.logic.azure.com:443/workflows/2781bd2275954154805e1b5f76eb4285/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ILSAFGPG3OQxfBxw3kUhgOi3bBRRaLw3WqW_EdOyOZ8&groupId=${groupId}&datasetId=${datasetId}`;
+      const triggerUrl = `https://prod-59.southeastasia.logic.azure.com:443/workflows/2781bd2275954154805e1b5f76eb4285/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ILSAFGPG3OQxfBxw3kUhgOi3bBRRaLw3WqW_EdOyOZ8&workspaceType=${workspaceType}&groupIdForRefreshDataflow=${groupIdForRefreshDataflow}&dataflowIdForRefreshDataflow=${dataflowIdForRefreshDataflow}`;
       console.log("Trigger URL : "+ triggerUrl);
       async function refreshDataset() {
         document.getElementById("status").textContent = "🚀 Đang gửi yêu cầu làm mới...";
