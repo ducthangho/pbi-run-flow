@@ -37,7 +37,7 @@
     console.log("dataflowIdForRefreshDataflow "+dataflowIdForRefreshDataflow);
 
     if (!groupIdForRefreshDataflow || !dataflowIdForRefreshDataflow) {
-      document.getElementById("status").textContent = "❌ Thiếu tham số groupId hoặc datasetId trong URL.";
+      document.getElementById("status").textContent = "❌ Thiếu tham số groupIdForRefreshDataflow hoặc dataflowIdForRefreshDataflow trong URL.";
       document.querySelector(".loader").style.display = "none";
     } else {
       const triggerUrl = `https://prod-59.southeastasia.logic.azure.com:443/workflows/2781bd2275954154805e1b5f76eb4285/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ILSAFGPG3OQxfBxw3kUhgOi3bBRRaLw3WqW_EdOyOZ8&workspaceType=${workspaceType}&groupIdForRefreshDataflow=${groupIdForRefreshDataflow}&dataflowIdForRefreshDataflow=${dataflowIdForRefreshDataflow}`;
