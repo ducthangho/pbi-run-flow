@@ -36,7 +36,7 @@
     console.log("groupIdForRefreshDataflow "+groupIdForRefreshDataflow);
     console.log("dataflowIdForRefreshDataflow "+dataflowIdForRefreshDataflow);
 
-    if (!groupIdForRefreshDataflow || !dataflowIdForRefreshDataflow) {
+    if (!workspaceType || !groupIdForRefreshDataflow || !dataflowIdForRefreshDataflow){
       document.getElementById("status").textContent = "❌ Thiếu tham số groupIdForRefreshDataflow hoặc dataflowIdForRefreshDataflow trong URL.";
       document.querySelector(".loader").style.display = "none";
     } else {
