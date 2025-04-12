@@ -33,7 +33,7 @@
     const groupId = params.get("groupIdForRefreshDataflow");
     const dataflowId = params.get("dataflowIdForRefreshDataflow");
 
-    const triggerUrl = `https://your-flow-1-url/triggers/manual/paths/invoke?workspaceType=${workspaceType}&groupIdForRefreshDataflow=${groupId}&dataflowIdForRefreshDataflow=${dataflowId}`;
+    const triggerUrl = `https://prod-59.southeastasia.logic.azure.com:443/workflows/2781bd2275954154805e1b5f76eb4285/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ILSAFGPG3OQxfBxw3kUhgOi3bBRRaLw3WqW_EdOyOZ8&workspaceType=${workspaceType}&groupIdForRefreshDataflow=${groupId}&dataflowIdForRefreshDataflow=${dataflowId}`;
     const statusUrl = "https://prod-94.southeastasia.logic.azure.com:443/workflows/57a3609a1436453eba629af845f2bef9/triggers/manual/paths/invoke?api-version=2016-06-01"; // Flow 3: checkStatus?requestId=
 
     if (!workspaceType || !groupId || !dataflowId) {
