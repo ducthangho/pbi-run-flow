@@ -90,8 +90,8 @@
         try {
           console.log("Polling ",requestId);
           
-          const res = await fetch(`${statusUrl}?requestId=${encodeURIComponent(requestId)}`);
-          console.log("URL = ", `${statusUrl}?requestId=${encodeURIComponent(requestId)}`);
+          const res = await fetch(`${statusUrl}&requestId=${encodeURIComponent(requestId)}`);
+          console.log("URL = "+ `${statusUrl}&requestId=${encodeURIComponent(requestId)}`);
           const data = await res.json();
 
           if (data.status === "Completed") {
