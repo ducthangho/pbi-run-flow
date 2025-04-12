@@ -29,56 +29,82 @@
 
   <script>
     const params = new URLSearchParams(window.location.search);
-    
     const workspaceType = params.get("workspaceType");
-    const groupIdForRefreshDataflow = params.get("groupIdForRefreshDataflow");
-    const dataflowIdForRefreshDataflow = params.get("dataflowIdForRefreshDataflow");
-    console.log("groupIdForRefreshDataflow "+groupIdForRefreshDataflow);
-    console.log("dataflowIdForRefreshDataflow "+dataflowIdForRefreshDataflow);
+    const groupId = params.get("groupIdForRefreshDataflow");
+    const dataflowId = params.get("dataflowIdForRefreshDataflow");
 
-    if (!workspaceType || !groupIdForRefreshDataflow || !dataflowIdForRefreshDataflow){
-      document.getElementById("status").textContent = "❌ Thiếu tham số groupIdForRefreshDataflow hoặc dataflowIdForRefreshDataflow trong URL.";
+    const triggerUrl = `https://your-flow-1-url/triggers/manual/paths/invoke?workspaceType=${workspaceType}&groupIdForRefreshDataflow=${groupId}&dataflowIdForRefreshDataflow=${dataflowId}`;
+    const statusUrl = "https://prod-94.southeastasia.logic.azure.com:443/workflows/57a3609a1436453eba629af845f2bef9/triggers/manual/paths/invoke?api-version=2016-06-01"; // Flow 3: checkStatus?requestId=
+
+    if (!workspaceType || !groupId || !dataflowId) {
+      document.getElementById("status").textContent = "❌ Thiếu tham số trong URL.";
       document.querySelector(".loader").style.display = "none";
     } else {
-      const triggerUrl = `https://prod-59.southeastasia.logic.azure.com:443/workflows/2781bd2275954154805e1b5f76eb4285/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ILSAFGPG3OQxfBxw3kUhgOi3bBRRaLw3WqW_EdOyOZ8&workspaceType=${workspaceType}&groupIdForRefreshDataflow=${groupIdForRefreshDataflow}&dataflowIdForRefreshDataflow=${dataflowIdForRefreshDataflow}`;
-      console.log("Trigger URL : "+ triggerUrl);
-      async function refreshDataset() {
-        document.getElementById("status").textContent = "🚀 Đang gửi yêu cầu làm mới...";
+      refreshDataflow();
+    }
 
+    async function refreshDataflow() {
+      document.getElementById("status").textContent = "🚀 Đang gửi yêu cầu làm mới...";
+
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 600000); // 10 phút timeout
+
+        const response = await fetch(triggerUrl, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal
+        });
+
+        clearTimeout(timeout);
+
+        if (!response.ok) throw new Error("Lỗi HTTP: " + response.status);
+
+        const resultText = await response.text();
+        let result;
         try {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 600000); // ⏳ 10 phút timeout
+          result = JSON.parse(resultText);
+        } catch (e) {
+          result = { message: resultText };
+        }
 
-          const response = await fetch(triggerUrl, {
-            method: "GET",
-            headers: { "Content-Type": "application/json" },
-            signal: controller.signal
-          });
+        const requestId = result.requestId;
+        document.getElementById("status").textContent = result.message || "Yêu cầu đã được gửi đi. Đang theo dõi...";
+        pollStatus(requestId);
 
-          clearTimeout(timeout);
+      } catch (err) {
+        document.querySelector("h2").textContent = "❌ Có lỗi xảy ra";
+        document.getElementById("status").textContent = "Không thể gửi yêu cầu làm mới: " + err.message;
+        document.querySelector(".loader").style.display = "none";
+      }
+    }
 
-          if (!response.ok) throw new Error("Lỗi HTTP: " + response.status);
+    function pollStatus(requestId) {
+      const interval = setInterval(async () => {
+        try {
+          const res = await fetch(`${statusUrl}?requestId=${encodeURIComponent(requestId)}`);
+          const data = await res.json();
 
-          const resultText = await response.text();
-          let result;
-          try {
-            result = JSON.parse(resultText);
-          } catch (e) {
-            result = { message: resultText };
+          if (data.status === "Completed") {
+            clearInterval(interval);
+            document.querySelector("h2").textContent = "✅ Làm mới thành công!";
+            document.getElementById("status").textContent = data.message || "Dataset đã làm mới xong.";
+            document.querySelector(".loader").style.display = "none";
+          } else if (data.status === "Failed") {
+            clearInterval(interval);
+            document.querySelector("h2").textContent = "❌ Làm mới thất bại!";
+            document.getElementById("status").textContent = data.message || "Có lỗi xảy ra khi làm mới.";
+            document.querySelector(".loader").style.display = "none";
+          } else {
+            document.getElementById("status").textContent = `⏳ Trạng thái hiện tại: ${data.status}`;
           }
-
-          document.querySelector("h2").textContent = "✅ Làm mới thành công!";
-          document.getElementById("status").textContent = result.message || "Dataset đã được gửi yêu cầu làm mới.";
-          document.querySelector(".loader").style.display = "none";
-
         } catch (err) {
-          document.querySelector("h2").textContent = "❌ Có lỗi xảy ra";
-          document.getElementById("status").textContent = "Không thể gửi yêu cầu làm mới: " + err.message;
+          clearInterval(interval);
+          document.querySelector("h2").textContent = "❌ Lỗi khi kiểm tra trạng thái!";
+          document.getElementById("status").textContent = err.message;
           document.querySelector(".loader").style.display = "none";
         }
-      }
-
-      refreshDataset();
+      }, 30000); // Kiểm tra mỗi 30 giây
     }
   </script>
 </body>
