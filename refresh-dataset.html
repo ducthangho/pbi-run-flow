@@ -93,20 +93,22 @@
           const res = await fetch(`${statusUrl}&requestId=${encodeURIComponent(requestId)}`);
           // console.log("URL = "+ `${statusUrl}&requestId=${encodeURIComponent(requestId)}`);
           const data = await res.json();
+
+          const status = data.status?.Value || data.status; // lấy .Value nếu là object
           console.log("Response : "+JSON.stringify(data));
 
-          if (data.status === "Completed") {
+          if (status === "Completed") {
             clearInterval(interval);
             document.querySelector("h2").textContent = "✅ Làm mới thành công!";
             document.getElementById("status").textContent = data.message || "Dataset đã làm mới xong.";
             document.querySelector(".loader").style.display = "none";
-          } else if (data.status === "Failed") {
+          } else if (status === "Failed") {
             clearInterval(interval);
             document.querySelector("h2").textContent = "❌ Làm mới thất bại!";
             document.getElementById("status").textContent = data.message || "Có lỗi xảy ra khi làm mới.";
             document.querySelector(".loader").style.display = "none";
           } else {
-            document.getElementById("status").textContent = `⏳ Trạng thái hiện tại: ${data.status}`;
+            document.getElementById("status").textContent = `⏳ Trạng thái hiện tại: ${status}`;
           }
         } catch (err) {
           clearInterval(interval);
