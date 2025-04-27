@@ -31,20 +31,26 @@
 
   <script>
     const params = new URLSearchParams(window.location.search);
-    const workspaceType = params.get("workspaceType");
-    const groupId       = params.get("groupIdForRefreshDataflow");
-    const dataflowId    = params.get("dataflowIdForRefreshDataflow");
-    const datasetId     = params.get("datasetId"); // Thêm param nếu cần
-    const triggerUrl    = `https://prod-59.southeastasia.logic.azure.com:443/workflows/2781bd2275954154805e1b5f76eb4285/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ILSAFGPG3OQxfBxw3kUhgOi3bBRRaLw3WqW_EdOyOZ8&workspaceType=${workspaceType}&groupIdForRefreshDataflow=${groupId}&dataflowIdForRefreshDataflow=${dataflowId}`;
-    const statusUrl     = `https://prod-94.southeastasia.logic.azure.com:443/workflows/57a3609a1436453eba629af845f2bef9/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=1suBwyXJig4VgJG89pAjpmKG9-0ReXexLShLFdBxCtg`; // check Dataflow status
-    const dsTriggerUrl  = `https://prod-XX.../invoke?datasetId=${datasetId}`; // Flow trigger dataset refresh
-    const dsStatusUrl   = `https://prod-YY.../invoke?datasetId=${datasetId}`; // Flow check dataset status
+    const groupId = params.get("groupId");
+    const dataflowId = params.get("dataflowId");
+    const datasetId = params.get("datasetId");
+    const requestId = params.get("requestId") || generateRequestId();
+    
+    // URL cho các API mới
+    const triggerUrl = `https://pbirefresh.azurewebsites.net/api/TriggerRefresh?groupId=${groupId}&dataflowId=${dataflowId}&datasetId=${datasetId}&requestId=${requestId}`;
+    const statusUrl = `https://pbirefresh.azurewebsites.net/api/CheckRefreshStatus?groupId=${groupId}&dataflowId=${dataflowId}&datasetId=${datasetId}&requestId=${requestId}`;
 
-    if (!workspaceType || !groupId || !dataflowId) {
-      document.getElementById("status").textContent = "❌ Thiếu tham số trong URL.";
+    // Kiểm tra tham số bắt buộc
+    if (!groupId || (!dataflowId && !datasetId)) {
+      document.getElementById("status").textContent = "❌ Thiếu tham số trong URL. Cần có groupId và ít nhất một trong dataflowId hoặc datasetId.";
       document.querySelector(".loader").style.display = "none";
     } else {
-      refreshDataflow();
+      refreshPowerBI();
+    }
+
+    // Tạo requestId nếu không được cung cấp
+    function generateRequestId() {
+      return `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     }
 
     // Hiển thị đồng hồ đếm ngược / thời gian chờ
@@ -55,66 +61,75 @@
       timerEl.textContent = `⏱ Đã chờ: ${Math.floor(seconds/60)} phút ${seconds%60} giây`;
     }, 1000);
 
-    async function refreshDataflow() {
-      document.getElementById("status").textContent = "🚀 Gửi yêu cầu làm mới Dataflow...";
+    async function refreshPowerBI() {
+      document.getElementById("status").textContent = "🚀 Gửi yêu cầu làm mới Power BI...";
       try {
         const res = await fetchWithTimeout(triggerUrl, { method: "GET" }, 600000);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const txt = await res.text();
-        const result = JSON.parse(txt || '{}');
-        const requestId = result.requestId;
-        if (!requestId) {
-          document.getElementById("status").textContent = "❌ Không nhận được requestId từ server.";
-          return;
+        const result = await res.json();
+        
+        if (!result || result.error) {
+          throw new Error(result.error || "Không nhận được phản hồi hợp lệ từ server");
         }
-        document.getElementById("status").textContent = "✅ Dataflow được trigger. Đang theo dõi...";
-        pollStatus(requestId, statusUrl, "Dataflow", () => {
-          // Khi Dataflow hoàn thành, trigger Dataset refresh
-          document.getElementById("status").textContent = "🚀 Đang trigger refresh Dataset...";
-          // startDatasetRefresh();
-        });
+        
+        document.getElementById("status").textContent = "✅ Yêu cầu làm mới đã được gửi. Đang theo dõi...";
+        pollStatus(requestId, statusUrl);
       } catch (err) {
-        showError("gửi yêu cầu làm mới Dataflow", err);
+        showError("gửi yêu cầu làm mới", err);
       }
     }
 
-    function startDatasetRefresh() {
-      fetch(dsTriggerUrl)
-        .then(res => res.json())
-        .then(r => {
-          const dsReqId = r.requestId;
-          if (!dsReqId) {
-            document.getElementById("status").textContent = "❌ Không nhận được requestId Dataset.";
-            return;
-          }
-          document.getElementById("status").textContent = "✅ Dataset được trigger. Đang theo dõi...";
-          pollStatus(dsReqId, dsStatusUrl, "Dataset", () => {
-            document.getElementById("title").textContent = "✅ Dataset đã làm mới xong!";
-            document.getElementById("status").textContent = "Toàn bộ quá trình hoàn tất.";
-            document.querySelector(".loader").style.display = "none";
-          });
-        })
-        .catch(err => showError("trigger Dataset refresh", err));
-    }
-
     // Hàm chung để poll trạng thái với retry logic
-    function pollStatus(requestId, url, label, onComplete) {
+    function pollStatus(requestId, url) {
       let retries = 0, maxRetries = 3;
       const interval = setInterval(async () => {
         try {
-          const res = await fetch(`${url}&requestId=${encodeURIComponent(requestId)}`);
+          const res = await fetch(url);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
-          const status = data.status?.Value || data.status;
-          document.getElementById("status").textContent = `⏳ ${label} status: ${status}`;
-          if (status === "Completed") {
-            clearInterval(interval);
-            onComplete();
+          
+          // Hiển thị trạng thái
+          let statusText = "⏳ Đang theo dõi trạng thái...";
+          let isCompleted = false;
+          let isFailed = false;
+          
+          if (data.dataflow) {
+            statusText = `⏳ Dataflow: ${data.dataflow.status || "Đang chờ"}`;
+            if (data.dataflow.status === "DataflowCompleted") {
+              statusText += " ✅";
+            } else if (data.dataflow.status === "DataflowFailed") {
+              statusText += " ❌";
+              isFailed = true;
+            }
           }
-          else if (status === "Failed") {
+          
+          if (data.dataset) {
+            statusText += `<br>⏳ Dataset: ${data.dataset.status || "Đang chờ"}`;
+            if (data.dataset.status === "DatasetCompleted") {
+              statusText += " ✅";
+            } else if (data.dataset.status === "DatasetFailed") {
+              statusText += " ❌";
+              isFailed = true;
+            }
+          }
+          
+          document.getElementById("status").innerHTML = statusText;
+          
+          // Kiểm tra nếu cả hai đều hoàn thành hoặc một trong hai thất bại
+          const dataflowCompleted = !data.dataflow || data.dataflow.status === "DataflowCompleted";
+          const datasetCompleted = !data.dataset || data.dataset.status === "DatasetCompleted";
+          
+          if ((dataflowCompleted && datasetCompleted) || isFailed) {
             clearInterval(interval);
-            document.getElementById("title").textContent = `❌ ${label} thất bại!`;
-            document.getElementById("status").textContent = data.message || `Có lỗi khi làm mới ${label}.`;
+            
+            if (isFailed) {
+              document.getElementById("title").textContent = "❌ Làm mới thất bại!";
+              document.getElementById("status").textContent = "Có lỗi xảy ra trong quá trình làm mới.";
+            } else {
+              document.getElementById("title").textContent = "✅ Làm mới hoàn tất!";
+              document.getElementById("status").textContent = "Toàn bộ quá trình làm mới đã hoàn tất thành công.";
+            }
+            
             document.querySelector(".loader").style.display = "none";
           }
         } catch (err) {
@@ -123,10 +138,10 @@
             console.warn(`Retry ${retries}/${maxRetries} do lỗi:`, err);
           } else {
             clearInterval(interval);
-            showError(`kiểm tra trạng thái ${label}`, err);
+            showError("kiểm tra trạng thái", err);
           }
         }
-      }, 30000);
+      }, 30000); // Kiểm tra mỗi 30 giây
     }
 
     // Fetch có timeout
