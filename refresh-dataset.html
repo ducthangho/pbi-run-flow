@@ -1,162 +1,383 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <link rel="icon" href="data:,">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
-  <title>Đang làm mới dữ liệu Power BI dataset...</title>
-  <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding-top: 60px; }
-    #status { font-size: 1.2em; margin-top: 20px; }
-    .loader {
-      border: 6px solid #f3f3f3;
-      border-top: 6px solid #3498db;
-      border-radius: 50%;
-      width: 50px;
-      height: 50px;
-      animation: spin 1s linear infinite;
-      margin: 20px auto;
-    }
-    #timer { margin-top: 10px; font-size: 0.9em; color: #555; }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power BI Refresh Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .status-badge {
+            font-size: 0.9em;
+            padding: 0.4em 0.8em;
+        }
+        .refresh-history {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .loading {
+            position: relative;
+            opacity: 0.7;
+            pointer-events: none;
+        }
+        .loading::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 2rem;
+            height: 2rem;
+            margin: -1rem 0 0 -1rem;
+            border: 0.25rem solid #f3f3f3;
+            border-top: 0.25rem solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error-message {
+            color: #dc3545;
+            margin-top: 0.5rem;
+        }
+        .success-message {
+            color: #198754;
+            margin-top: 0.5rem;
+        }
+    </style>
 </head>
 <body>
-  <h2 id="title">🔄 Đang làm mới dữ liệu Power BI...</h2>
-  <div class="loader"></div>
-  <div id="status">Vui lòng chờ trong giây lát...</div>
-  <div id="timer"></div>
-
-  <script>
-    const params = new URLSearchParams(window.location.search);
-    const groupId = params.get("groupId");
-    const dataflowId = params.get("dataflowId");
-    const datasetId = params.get("datasetId");
-    const requestId = params.get("requestId") || generateRequestId();
-    
-    // URL cho các API mới
-    const triggerUrl = `https://pbirefresh.azurewebsites.net/api/TriggerRefresh?groupId=${groupId}&dataflowId=${dataflowId}&datasetId=${datasetId}&requestId=${requestId}`;
-    const statusUrl = `https://pbirefresh.azurewebsites.net/api/CheckRefreshStatus?groupId=${groupId}&dataflowId=${dataflowId}&datasetId=${datasetId}&requestId=${requestId}`;
-
-    // Kiểm tra tham số bắt buộc
-    if (!groupId || (!dataflowId && !datasetId)) {
-      document.getElementById("status").textContent = "❌ Thiếu tham số trong URL. Cần có groupId và ít nhất một trong dataflowId hoặc datasetId.";
-      document.querySelector(".loader").style.display = "none";
-    } else {
-      refreshPowerBI();
-    }
-
-    // Tạo requestId nếu không được cung cấp
-    function generateRequestId() {
-      return `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    }
-
-    // Hiển thị đồng hồ đếm ngược / thời gian chờ
-    let seconds = 0;
-    const timerEl = document.getElementById("timer");
-    setInterval(() => {
-      seconds++;
-      timerEl.textContent = `⏱ Đã chờ: ${Math.floor(seconds/60)} phút ${seconds%60} giây`;
-    }, 1000);
-
-    async function refreshPowerBI() {
-      document.getElementById("status").textContent = "🚀 Gửi yêu cầu làm mới Power BI...";
-      try {
-        const res = await fetchWithTimeout(triggerUrl, { method: "GET" }, 600000);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const result = await res.json();
+    <div class="container mt-4">
+        <h2>Power BI Refresh Manager</h2>
         
-        if (!result || result.error) {
-          throw new Error(result.error || "Không nhận được phản hồi hợp lệ từ server");
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Trigger Refresh</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="refreshForm">
+                            <div class="mb-3">
+                                <label for="groupId" class="form-label">Workspace ID</label>
+                                <input type="text" class="form-control" id="groupId" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="dataflowId" class="form-label">Dataflow ID</label>
+                                <input type="text" class="form-control" id="dataflowId">
+                                <div class="form-text">Leave empty if you only want to refresh dataset</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="datasetId" class="form-label">Dataset ID</label>
+                                <input type="text" class="form-control" id="datasetId">
+                                <div class="form-text">Leave empty if you only want to refresh dataflow</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="refreshButton">Trigger Refresh</button>
+                        </form>
+                        <div id="refreshResult" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Check Refresh Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="statusForm">
+                            <div class="mb-3">
+                                <label for="statusGroupId" class="form-label">Workspace ID</label>
+                                <input type="text" class="form-control" id="statusGroupId" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="statusDataflowId" class="form-label">Dataflow ID</label>
+                                <input type="text" class="form-control" id="statusDataflowId">
+                            </div>
+                            <div class="mb-3">
+                                <label for="statusDatasetId" class="form-label">Dataset ID</label>
+                                <input type="text" class="form-control" id="statusDatasetId">
+                            </div>
+                            <div class="mb-3">
+                                <label for="requestId" class="form-label">Request ID</label>
+                                <input type="text" class="form-control" id="requestId" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="checkType" class="form-label">Check Type</label>
+                                <select class="form-select" id="checkType">
+                                    <option value="both">Both Dataflow and Dataset</option>
+                                    <option value="dataflow">Dataflow Only</option>
+                                    <option value="dataset">Dataset Only</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="statusButton">Check Status</button>
+                        </form>
+                        <div id="statusResult" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Refresh History</h5>
+                    </div>
+                    <div class="card-body refresh-history">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Request ID</th>
+                                    <th>Dataflow ID</th>
+                                    <th>Dataset ID</th>
+                                    <th>Dataflow Status</th>
+                                    <th>Dataset Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Lưu trữ lịch sử refresh
+        let refreshHistory = JSON.parse(localStorage.getItem('refreshHistory') || '[]');
+        
+        // Cập nhật bảng lịch sử
+        function updateHistoryTable() {
+            const tbody = document.getElementById('historyTableBody');
+            tbody.innerHTML = '';
+            
+            refreshHistory.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${new Date(item.timestamp).toLocaleString()}</td>
+                    <td>${item.requestId}</td>
+                    <td>${item.dataflowId || '-'}</td>
+                    <td>${item.datasetId || '-'}</td>
+                    <td>${getStatusBadge(item.dataflowStatus)}</td>
+                    <td>${getStatusBadge(item.datasetStatus)}</td>
+                `;
+                tbody.appendChild(row);
+            });
         }
         
-        document.getElementById("status").textContent = "✅ Yêu cầu làm mới đã được gửi. Đang theo dõi...";
-        pollStatus(requestId, statusUrl);
-      } catch (err) {
-        showError("gửi yêu cầu làm mới", err);
-      }
-    }
-
-    // Hàm chung để poll trạng thái với retry logic
-    function pollStatus(requestId, url) {
-      let retries = 0, maxRetries = 3;
-      const interval = setInterval(async () => {
-        try {
-          const res = await fetch(url);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const data = await res.json();
-          
-          // Hiển thị trạng thái
-          let statusText = "⏳ Đang theo dõi trạng thái...";
-          let isCompleted = false;
-          let isFailed = false;
-          
-          if (data.dataflow) {
-            statusText = `⏳ Dataflow: ${data.dataflow.status || "Đang chờ"}`;
-            if (data.dataflow.status === "DataflowCompleted") {
-              statusText += " ✅";
-            } else if (data.dataflow.status === "DataflowFailed") {
-              statusText += " ❌";
-              isFailed = true;
-            }
-          }
-          
-          if (data.dataset) {
-            statusText += `<br>⏳ Dataset: ${data.dataset.status || "Đang chờ"}`;
-            if (data.dataset.status === "DatasetCompleted") {
-              statusText += " ✅";
-            } else if (data.dataset.status === "DatasetFailed") {
-              statusText += " ❌";
-              isFailed = true;
-            }
-          }
-          
-          document.getElementById("status").innerHTML = statusText;
-          
-          // Kiểm tra nếu cả hai đều hoàn thành hoặc một trong hai thất bại
-          const dataflowCompleted = !data.dataflow || data.dataflow.status === "DataflowCompleted";
-          const datasetCompleted = !data.dataset || data.dataset.status === "DatasetCompleted";
-          
-          if ((dataflowCompleted && datasetCompleted) || isFailed) {
-            clearInterval(interval);
+        // Tạo badge trạng thái
+        function getStatusBadge(status) {
+            if (!status) return '-';
             
-            if (isFailed) {
-              document.getElementById("title").textContent = "❌ Làm mới thất bại!";
-              document.getElementById("status").textContent = "Có lỗi xảy ra trong quá trình làm mới.";
-            } else {
-              document.getElementById("title").textContent = "✅ Làm mới hoàn tất!";
-              document.getElementById("status").textContent = "Toàn bộ quá trình làm mới đã hoàn tất thành công.";
+            let badgeClass = 'bg-secondary';
+            if (status.includes('Completed')) {
+                badgeClass = 'bg-success';
+            } else if (status.includes('Failed')) {
+                badgeClass = 'bg-danger';
+            } else if (status.includes('Refreshing')) {
+                badgeClass = 'bg-primary';
             }
             
-            document.querySelector(".loader").style.display = "none";
-          }
-        } catch (err) {
-          if (retries < maxRetries) {
-            retries++;
-            console.warn(`Retry ${retries}/${maxRetries} do lỗi:`, err);
-          } else {
-            clearInterval(interval);
-            showError("kiểm tra trạng thái", err);
-          }
+            return `<span class="badge ${badgeClass} status-badge">${status}</span>`;
         }
-      }, 30000); // Kiểm tra mỗi 30 giây
-    }
-
-    // Fetch có timeout
-    function fetchWithTimeout(resource, options = {}, timeout = 60000) {
-      const controller = new AbortController();
-      const id = setTimeout(() => controller.abort(), timeout);
-      return fetch(resource, { ...options, signal: controller.signal })
-        .finally(() => clearTimeout(id));
-    }
-
-    function showError(context, err) {
-      document.getElementById("title").textContent = "❌ Có lỗi xảy ra";
-      document.getElementById("status").textContent = `Lỗi khi ${context}: ${err.message}`;
-      document.querySelector(".loader").style.display = "none";
-    }
-  </script>
+        
+        // Thêm vào lịch sử
+        function addToHistory(requestId, dataflowId, datasetId, dataflowStatus, datasetStatus) {
+            refreshHistory.unshift({
+                timestamp: Date.now(),
+                requestId,
+                dataflowId,
+                datasetId,
+                dataflowStatus,
+                datasetStatus
+            });
+            
+            // Giới hạn 50 mục
+            if (refreshHistory.length > 50) {
+                refreshHistory = refreshHistory.slice(0, 50);
+            }
+            
+            localStorage.setItem('refreshHistory', JSON.stringify(refreshHistory));
+            updateHistoryTable();
+        }
+        
+        // Hiển thị kết quả
+        function showResult(elementId, message, isError = false) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="alert ${isError ? 'alert-danger' : 'alert-success'}">${message}</div>`;
+        }
+        
+        // Xử lý form trigger refresh
+        document.getElementById('refreshForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const groupId = document.getElementById('groupId').value.trim();
+            const dataflowId = document.getElementById('dataflowId').value.trim();
+            const datasetId = document.getElementById('datasetId').value.trim();
+            
+            if (!groupId) {
+                showResult('refreshResult', 'Workspace ID is required', true);
+                return;
+            }
+            
+            if (!dataflowId && !datasetId) {
+                showResult('refreshResult', 'At least one of Dataflow ID or Dataset ID is required', true);
+                return;
+            }
+            
+            const refreshButton = document.getElementById('refreshButton');
+            refreshButton.disabled = true;
+            refreshButton.classList.add('loading');
+            
+            try {
+                const response = await fetch('/api/TriggerRefresh', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        groupId,
+                        dataflowId: dataflowId || null,
+                        datasetId: datasetId || null
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    let message = 'Refresh triggered successfully.<br>';
+                    
+                    if (result.dataflow) {
+                        message += `Dataflow: ${result.dataflow.status}<br>`;
+                    }
+                    
+                    if (result.dataset) {
+                        message += `Dataset: ${result.dataset.status}<br>`;
+                    }
+                    
+                    message += `Request ID: ${result.requestId}`;
+                    
+                    showResult('refreshResult', message);
+                    
+                    // Thêm vào lịch sử
+                    addToHistory(
+                        result.requestId,
+                        dataflowId || null,
+                        datasetId || null,
+                        result.dataflow?.status || null,
+                        result.dataset?.status || null
+                    );
+                    
+                    // Tự động điền requestId vào form kiểm tra trạng thái
+                    document.getElementById('statusGroupId').value = groupId;
+                    document.getElementById('statusDataflowId').value = dataflowId;
+                    document.getElementById('statusDatasetId').value = datasetId;
+                    document.getElementById('requestId').value = result.requestId;
+                    
+                    // Tự động kiểm tra trạng thái sau 5 giây
+                    setTimeout(() => {
+                        document.getElementById('statusForm').dispatchEvent(new Event('submit'));
+                    }, 5000);
+                } else {
+                    showResult('refreshResult', `Error: ${result.error || 'Unknown error'}`, true);
+                }
+            } catch (error) {
+                showResult('refreshResult', `Error: ${error.message}`, true);
+            } finally {
+                refreshButton.disabled = false;
+                refreshButton.classList.remove('loading');
+            }
+        });
+        
+        // Xử lý form kiểm tra trạng thái
+        document.getElementById('statusForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const groupId = document.getElementById('statusGroupId').value.trim();
+            const dataflowId = document.getElementById('statusDataflowId').value.trim();
+            const datasetId = document.getElementById('statusDatasetId').value.trim();
+            const requestId = document.getElementById('requestId').value.trim();
+            const checkType = document.getElementById('checkType').value;
+            
+            if (!groupId || !requestId) {
+                showResult('statusResult', 'Workspace ID and Request ID are required', true);
+                return;
+            }
+            
+            const statusButton = document.getElementById('statusButton');
+            statusButton.disabled = true;
+            statusButton.classList.add('loading');
+            
+            try {
+                const response = await fetch('/api/CheckRefreshStatus', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        groupId,
+                        dataflowId: dataflowId || null,
+                        datasetId: datasetId || null,
+                        requestId,
+                        checkType
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    let message = '';
+                    
+                    if (result.dataflow) {
+                        message += `Dataflow: ${getStatusBadge(result.dataflow.status)}<br>`;
+                        if (result.dataflow.message) {
+                            message += `<small class="text-muted">${result.dataflow.message}</small><br>`;
+                        }
+                    }
+                    
+                    if (result.dataset) {
+                        message += `Dataset: ${getStatusBadge(result.dataset.status)}<br>`;
+                        if (result.dataset.message) {
+                            message += `<small class="text-muted">${result.dataset.message}</small><br>`;
+                        }
+                    }
+                    
+                    message += `<small class="text-muted">Last Updated: ${new Date(result.lastUpdated).toLocaleString()}</small>`;
+                    
+                    document.getElementById('statusResult').innerHTML = message;
+                    
+                    // Cập nhật lịch sử
+                    const historyItem = refreshHistory.find(item => item.requestId === requestId);
+                    if (historyItem) {
+                        historyItem.dataflowStatus = result.dataflow?.status || historyItem.dataflowStatus;
+                        historyItem.datasetStatus = result.dataset?.status || historyItem.datasetStatus;
+                        localStorage.setItem('refreshHistory', JSON.stringify(refreshHistory));
+                        updateHistoryTable();
+                    }
+                    
+                    // Nếu vẫn đang refresh, tự động kiểm tra lại sau 10 giây
+                    if ((result.dataflow?.status === 'DataflowRefreshing' && (checkType === 'dataflow' || checkType === 'both')) ||
+                        (result.dataset?.status === 'DatasetRefreshing' && (checkType === 'dataset' || checkType === 'both'))) {
+                        setTimeout(() => {
+                            document.getElementById('statusForm').dispatchEvent(new Event('submit'));
+                        }, 10000);
+                    }
+                } else {
+                    showResult('statusResult', `Error: ${result.error || 'Unknown error'}`, true);
+                }
+            } catch (error) {
+                showResult('statusResult', `Error: ${error.message}`, true);
+            } finally {
+                statusButton.disabled = false;
+                statusButton.classList.remove('loading');
+            }
+        });
+        
+        // Khởi tạo bảng lịch sử
+        updateHistoryTable();
+    </script>
 </body>
 </html>
