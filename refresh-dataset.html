@@ -91,14 +91,6 @@
                                 <input type="text" class="form-control" id="statusGroupId" required>
                             </div>
                             <div class="mb-3">
-                                <label for="statusDataflowId" class="form-label">Dataflow ID</label>
-                                <input type="text" class="form-control" id="statusDataflowId">
-                            </div>
-                            <div class="mb-3">
-                                <label for="statusDatasetId" class="form-label">Dataset ID</label>
-                                <input type="text" class="form-control" id="statusDatasetId">
-                            </div>
-                            <div class="mb-3">
                                 <label for="requestId" class="form-label">Request ID</label>
                                 <input type="text" class="form-control" id="requestId" required>
                             </div>
@@ -146,6 +138,9 @@
     </div>
 
     <script>
+        // API Base URL
+        const API_BASE_URL = 'https://pbirefresh-app.azurewebsites.net/api';
+        
         // Lưu trữ lịch sử refresh
         let refreshHistory = JSON.parse(localStorage.getItem('refreshHistory') || '[]');
         
@@ -233,18 +228,7 @@
             refreshButton.classList.add('loading');
             
             try {
-                const response = await fetch('/api/TriggerRefresh', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        groupId,
-                        dataflowId: dataflowId || null,
-                        datasetId: datasetId || null
-                    })
-                });
-                
+                const response = await fetch(`${API_BASE_URL}/triggerrefresh?groupId=${groupId}&dataflowId=${dataflowId}&datasetId=${datasetId}`);
                 const result = await response.json();
                 
                 if (response.ok) {
@@ -273,8 +257,6 @@
                     
                     // Tự động điền requestId vào form kiểm tra trạng thái
                     document.getElementById('statusGroupId').value = groupId;
-                    document.getElementById('statusDataflowId').value = dataflowId;
-                    document.getElementById('statusDatasetId').value = datasetId;
                     document.getElementById('requestId').value = result.requestId;
                     
                     // Tự động kiểm tra trạng thái sau 5 giây
@@ -297,8 +279,6 @@
             e.preventDefault();
             
             const groupId = document.getElementById('statusGroupId').value.trim();
-            const dataflowId = document.getElementById('statusDataflowId').value.trim();
-            const datasetId = document.getElementById('statusDatasetId').value.trim();
             const requestId = document.getElementById('requestId').value.trim();
             const checkType = document.getElementById('checkType').value;
             
@@ -312,20 +292,7 @@
             statusButton.classList.add('loading');
             
             try {
-                const response = await fetch('/api/CheckRefreshStatus', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        groupId,
-                        dataflowId: dataflowId || null,
-                        datasetId: datasetId || null,
-                        requestId,
-                        checkType
-                    })
-                });
-                
+                const response = await fetch(`${API_BASE_URL}/checkrefreshstatus?groupId=${groupId}&requestId=${requestId}&checkType=${checkType}`);
                 const result = await response.json();
                 
                 if (response.ok) {
