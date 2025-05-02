@@ -156,6 +156,14 @@
             const datasetId = getUrlParameter('datasetIdForRefreshDataflow');
             const requestId = getUrlParameter('requestIdForRefreshDataflow');
 
+            console.log('URL Parameters:', {
+                workspaceType,
+                groupId,
+                dataflowId,
+                datasetId,
+                requestId
+            });
+
             // Điền vào form trigger refresh
             if (groupId) {
                 document.getElementById('groupId').value = groupId;
@@ -270,45 +278,54 @@
             refreshButton.classList.add('loading');
             
             try {
-                const response = await fetch(`${API_BASE_URL}/triggerrefresh?groupId=${groupId}&dataflowId=${dataflowId}&datasetId=${datasetId}`);
-                const result = await response.json();
+                console.log('Triggering refresh with params:', { groupId, dataflowId, datasetId });
                 
-                if (response.ok) {
-                    let message = 'Refresh triggered successfully.<br>';
-                    
-                    if (result.dataflow) {
-                        message += `Dataflow: ${result.dataflow.status}<br>`;
-                    }
-                    
-                    if (result.dataset) {
-                        message += `Dataset: ${result.dataset.status}<br>`;
-                    }
-                    
-                    message += `Request ID: ${result.requestId}`;
-                    
-                    showResult('refreshResult', message);
-                    
-                    // Thêm vào lịch sử
-                    addToHistory(
-                        result.requestId,
-                        dataflowId || null,
-                        datasetId || null,
-                        result.dataflow?.status || null,
-                        result.dataset?.status || null
-                    );
-                    
-                    // Tự động điền requestId vào form kiểm tra trạng thái
-                    document.getElementById('statusGroupId').value = groupId;
-                    document.getElementById('requestId').value = result.requestId;
-                    
-                    // Tự động kiểm tra trạng thái sau 5 giây
-                    setTimeout(() => {
-                        document.getElementById('statusForm').dispatchEvent(new Event('submit'));
-                    }, 5000);
-                } else {
-                    showResult('refreshResult', `Error: ${result.error || 'Unknown error'}`, true);
+                const response = await fetch(`${API_BASE_URL}/triggerrefresh?groupId=${groupId}&dataflowId=${dataflowId}&datasetId=${datasetId}`);
+                console.log('Response status:', response.status);
+                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Error response:', errorText);
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                 }
+                
+                const result = await response.json();
+                console.log('Response data:', result);
+                
+                let message = 'Refresh triggered successfully.<br>';
+                
+                if (result.dataflow) {
+                    message += `Dataflow: ${result.dataflow.status}<br>`;
+                }
+                
+                if (result.dataset) {
+                    message += `Dataset: ${result.dataset.status}<br>`;
+                }
+                
+                message += `Request ID: ${result.requestId}`;
+                
+                showResult('refreshResult', message);
+                
+                // Thêm vào lịch sử
+                addToHistory(
+                    result.requestId,
+                    dataflowId || null,
+                    datasetId || null,
+                    result.dataflow?.status || null,
+                    result.dataset?.status || null
+                );
+                
+                // Tự động điền requestId vào form kiểm tra trạng thái
+                document.getElementById('statusGroupId').value = groupId;
+                document.getElementById('requestId').value = result.requestId;
+                
+                // Tự động kiểm tra trạng thái sau 5 giây
+                setTimeout(() => {
+                    document.getElementById('statusForm').dispatchEvent(new Event('submit'));
+                }, 5000);
             } catch (error) {
+                console.error('Error in refresh:', error);
                 showResult('refreshResult', `Error: ${error.message}`, true);
             } finally {
                 refreshButton.disabled = false;
@@ -334,50 +351,59 @@
             statusButton.classList.add('loading');
             
             try {
-                const response = await fetch(`${API_BASE_URL}/checkrefreshstatus?groupId=${groupId}&requestId=${requestId}&checkType=${checkType}`);
-                const result = await response.json();
+                console.log('Checking status with params:', { groupId, requestId, checkType });
                 
-                if (response.ok) {
-                    let message = '';
-                    
-                    if (result.dataflow) {
-                        message += `Dataflow: ${getStatusBadge(result.dataflow.status)}<br>`;
-                        if (result.dataflow.message) {
-                            message += `<small class="text-muted">${result.dataflow.message}</small><br>`;
-                        }
+                const response = await fetch(`${API_BASE_URL}/checkrefreshstatus?groupId=${groupId}&requestId=${requestId}&checkType=${checkType}`);
+                console.log('Response status:', response.status);
+                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Error response:', errorText);
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                }
+                
+                const result = await response.json();
+                console.log('Response data:', result);
+                
+                let message = '';
+                
+                if (result.dataflow) {
+                    message += `Dataflow: ${getStatusBadge(result.dataflow.status)}<br>`;
+                    if (result.dataflow.message) {
+                        message += `<small class="text-muted">${result.dataflow.message}</small><br>`;
                     }
-                    
-                    if (result.dataset) {
-                        message += `Dataset: ${getStatusBadge(result.dataset.status)}<br>`;
-                        if (result.dataset.message) {
-                            message += `<small class="text-muted">${result.dataset.message}</small><br>`;
-                        }
+                }
+                
+                if (result.dataset) {
+                    message += `Dataset: ${getStatusBadge(result.dataset.status)}<br>`;
+                    if (result.dataset.message) {
+                        message += `<small class="text-muted">${result.dataset.message}</small><br>`;
                     }
-                    
-                    message += `<small class="text-muted">Last Updated: ${new Date(result.lastUpdated).toLocaleString()}</small>`;
-                    
-                    document.getElementById('statusResult').innerHTML = message;
-                    
-                    // Cập nhật lịch sử
-                    const historyItem = refreshHistory.find(item => item.requestId === requestId);
-                    if (historyItem) {
-                        historyItem.dataflowStatus = result.dataflow?.status || historyItem.dataflowStatus;
-                        historyItem.datasetStatus = result.dataset?.status || historyItem.datasetStatus;
-                        localStorage.setItem('refreshHistory', JSON.stringify(refreshHistory));
-                        updateHistoryTable();
-                    }
-                    
-                    // Nếu vẫn đang refresh, tự động kiểm tra lại sau 10 giây
-                    if ((result.dataflow?.status === 'DataflowRefreshing' && (checkType === 'dataflow' || checkType === 'both')) ||
-                        (result.dataset?.status === 'DatasetRefreshing' && (checkType === 'dataset' || checkType === 'both'))) {
-                        setTimeout(() => {
-                            document.getElementById('statusForm').dispatchEvent(new Event('submit'));
-                        }, 10000);
-                    }
-                } else {
-                    showResult('statusResult', `Error: ${result.error || 'Unknown error'}`, true);
+                }
+                
+                message += `<small class="text-muted">Last Updated: ${new Date(result.lastUpdated).toLocaleString()}</small>`;
+                
+                document.getElementById('statusResult').innerHTML = message;
+                
+                // Cập nhật lịch sử
+                const historyItem = refreshHistory.find(item => item.requestId === requestId);
+                if (historyItem) {
+                    historyItem.dataflowStatus = result.dataflow?.status || historyItem.dataflowStatus;
+                    historyItem.datasetStatus = result.dataset?.status || historyItem.datasetStatus;
+                    localStorage.setItem('refreshHistory', JSON.stringify(refreshHistory));
+                    updateHistoryTable();
+                }
+                
+                // Nếu vẫn đang refresh, tự động kiểm tra lại sau 10 giây
+                if ((result.dataflow?.status === 'DataflowRefreshing' && (checkType === 'dataflow' || checkType === 'both')) ||
+                    (result.dataset?.status === 'DatasetRefreshing' && (checkType === 'dataset' || checkType === 'both'))) {
+                    setTimeout(() => {
+                        document.getElementById('statusForm').dispatchEvent(new Event('submit'));
+                    }, 10000);
                 }
             } catch (error) {
+                console.error('Error in status check:', error);
                 showResult('statusResult', `Error: ${error.message}`, true);
             } finally {
                 statusButton.disabled = false;
