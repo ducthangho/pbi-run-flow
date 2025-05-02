@@ -141,6 +141,48 @@
         // API Base URL
         const API_BASE_URL = 'https://pbirefresh-app.azurewebsites.net/api';
         
+        // Hàm lấy tham số từ URL
+        function getUrlParameter(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
+        }
+
+        // Điền tham số vào form khi trang được tải
+        function initializeForms() {
+            // Lấy tham số từ URL
+            const workspaceType = getUrlParameter('workspaceType');
+            const groupId = getUrlParameter('groupIdForRefreshDataflow');
+            const dataflowId = getUrlParameter('dataflowIdForRefreshDataflow');
+            const datasetId = getUrlParameter('datasetIdForRefreshDataflow');
+            const requestId = getUrlParameter('requestIdForRefreshDataflow');
+
+            // Điền vào form trigger refresh
+            if (groupId) {
+                document.getElementById('groupId').value = groupId;
+            }
+            if (dataflowId) {
+                document.getElementById('dataflowId').value = dataflowId;
+            }
+            if (datasetId) {
+                document.getElementById('datasetId').value = datasetId;
+            }
+
+            // Điền vào form kiểm tra trạng thái
+            if (groupId) {
+                document.getElementById('statusGroupId').value = groupId;
+            }
+            if (requestId) {
+                document.getElementById('requestId').value = requestId;
+            }
+
+            // Nếu có dataflowId, tự động trigger refresh
+            if (dataflowId && groupId) {
+                setTimeout(() => {
+                    document.getElementById('refreshForm').dispatchEvent(new Event('submit'));
+                }, 1000);
+            }
+        }
+
         // Lưu trữ lịch sử refresh
         let refreshHistory = JSON.parse(localStorage.getItem('refreshHistory') || '[]');
         
@@ -343,8 +385,9 @@
             }
         });
         
-        // Khởi tạo bảng lịch sử
+        // Khởi tạo bảng lịch sử và form
         updateHistoryTable();
+        initializeForms();
     </script>
 </body>
 </html>
