@@ -6,10 +6,29 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>Đang làm mới dữ liệu Power BI dataset...</title>
+  <title>Đang làm mới dữ liệu Power BI...</title>
+  <!-- 
+    =====================================================================
+    POWER BI REFRESH CLIENT - VERSION 2.1.1 (FIXED)
+    
+    MAJOR FIXES:
+    ✅ Fixed "Illegal return statement" error
+    ✅ Changed endpoint from CheckRefreshStatus to GetStatus (Azure Functions compatible)
+    ✅ Improved error handling for Azure Functions responses
+    ✅ Better CORS and connectivity detection
+    
+    DEVELOPER NOTES:
+    1. File này chứa các cấu hình kết nối API quan trọng tại biến globalParams.
+    2. KHÔNG THAY ĐỔI apiBaseUrl trừ khi bạn biết chính xác mình đang làm gì.
+    3. Khi deploy, hãy sử dụng URL API phù hợp với môi trường của bạn.
+    4. Phần cấu hình URL được đánh dấu với "IMPORTANT" comment.
+    
+    =====================================================================
+  -->
   <style>
     body { font-family: Arial, sans-serif; text-align: center; padding-top: 60px; max-width: 800px; margin: 0 auto; }
     #status { font-size: 1.2em; margin-top: 20px; }
+    #message { font-size: 1em; margin-top: 15px; color: #555; font-style: italic; }
     .loader {
       border: 6px solid #f3f3f3;
       border-top: 6px solid #3498db;
@@ -70,48 +89,176 @@
     .btn-info { background-color: #17a2b8; color: white; border: none; }
     .btn-info:hover { background-color: #138496; }
     .hidden { display: none; }
-    /* Form styles for POST method support */
-    #paramForm {
-      margin: 20px auto;
-      max-width: 500px;
-      text-align: left;
-      padding: 20px;
-      background-color: #f8f9fa;
+    .fixed-notice {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      font-size: 0.9em;
+    }
+    
+    /* Log Container Styles */
+    .log-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 400px;
+      max-height: 300px;
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
       border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
     }
-    .form-group {
-      margin-bottom: 15px;
-    }
-    .form-group label {
-      display: block;
-      margin-bottom: 5px;
-      font-weight: bold;
-    }
-    .form-group input {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid #ced4da;
-      border-radius: 4px;
-    }
-    .form-group .form-text {
-      font-size: 0.8em;
-      color: #6c757d;
-      margin-top: 5px;
-    }
-    .checkbox-group {
+    
+    .log-header {
+      background: #e9ecef;
+      padding: 8px 12px;
+      border-bottom: 1px solid #dee2e6;
+      border-radius: 7px 7px 0 0;
       display: flex;
+      justify-content: space-between;
       align-items: center;
     }
-    .checkbox-group input {
-      margin-right: 8px;
-      width: auto;
+    
+    .log-header h4 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    
+    .btn-small {
+      padding: 2px 8px;
+      font-size: 11px;
+      background: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    
+    .btn-small:hover {
+      background: #5a6268;
+    }
+    
+    .log-content {
+      max-height: 250px;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    
+    .log-entry {
+      margin-bottom: 8px;
+      padding: 6px;
+      border-radius: 4px;
+      border-left: 3px solid #6c757d;
+    }
+    
+    .log-entry.log-debug {
+      background: #f8f9fa;
+      border-left-color: #6c757d;
+    }
+    
+    .log-entry.log-info {
+      background: #d1ecf1;
+      border-left-color: #17a2b8;
+    }
+    
+    .log-entry.log-azure-call {
+      background: #d4edda;
+      border-left-color: #28a745;
+    }
+    
+    .log-entry.log-error {
+      background: #f8d7da;
+      border-left-color: #dc3545;
+    }
+    
+    .log-time {
+      font-weight: bold;
+      color: #6c757d;
+      font-size: 10px;
+    }
+    
+    .log-level {
+      display: inline-block;
+      padding: 1px 4px;
+      border-radius: 2px;
+      font-weight: bold;
+      font-size: 10px;
+      margin: 2px 0;
+    }
+    
+    .log-level-debug {
+      background: #6c757d;
+      color: white;
+    }
+    
+    .log-level-info {
+      background: #17a2b8;
+      color: white;
+    }
+    
+    .log-level-azure-call {
+      background: #28a745;
+      color: white;
+    }
+    
+    .log-level-error {
+      background: #dc3545;
+      color: white;
+    }
+    
+    .log-message {
+      margin: 2px 0;
+      font-weight: bold;
+    }
+    
+    .log-data {
+      margin-top: 4px;
+      background: #ffffff;
+      padding: 4px;
+      border-radius: 2px;
+      border: 1px solid #e9ecef;
+    }
+    
+    .log-data pre {
+      margin: 0;
+      font-size: 10px;
+      color: #495057;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    
+    .log-toggle-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      font-size: 18px;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      z-index: 999;
+    }
+    
+    .log-toggle-btn:hover {
+      background: #0056b3;
     }
   </style>
 </head>
 <body>
   <h2 id="title">🔄 Đang làm mới dữ liệu Power BI...</h2>
   
-  <!-- Form for manual input (only shown when no query params are available) -->
+  <!-- Form for manual input -->
   <div id="paramForm" class="hidden">
     <h3>Nhập thông tin làm mới</h3>
     <form id="refreshForm" method="post">
@@ -122,29 +269,18 @@
       <div class="form-group">
         <label for="dataflowId">Dataflow ID</label>
         <input type="text" id="dataflowId" name="dataflowId">
-        <div class="form-text">Bỏ trống nếu chỉ làm mới dataset</div>
       </div>
       <div class="form-group">
         <label for="datasetId">Dataset ID</label>
         <input type="text" id="datasetId" name="datasetId">
-        <div class="form-text">Bỏ trống nếu chỉ làm mới dataflow</div>
       </div>
       <div class="form-group">
         <label for="requestId">Request ID (tùy chọn)</label>
         <input type="text" id="requestId" name="requestId">
-        <div class="form-text">Nếu bỏ trống, hệ thống sẽ tự tạo</div>
       </div>
       <div class="form-group">
         <label for="apiBaseUrl">API Base URL (tùy chọn)</label>
         <input type="text" id="apiBaseUrl" name="apiBaseUrl" placeholder="https://pbirefresh.azurewebsites.net/api">
-      </div>
-      <div class="form-group checkbox-group">
-        <input type="checkbox" id="autoClose" name="autoClose" value="true">
-        <label for="autoClose">Tự động đóng cửa sổ sau khi hoàn thành</label>
-      </div>
-      <div class="form-group checkbox-group">
-        <input type="checkbox" id="showDetails" name="showDetails" value="true">
-        <label for="showDetails">Hiển thị chi tiết</label>
       </div>
       <button type="submit" class="btn btn-info">Bắt đầu làm mới</button>
     </form>
@@ -152,8 +288,12 @@
 
   <div class="loader" id="loader"></div>
   <div id="status">Vui lòng chờ trong giây lát...</div>
+  <div id="message"></div>
   <div id="timer"></div>
   <button id="toggleDetails" class="btn btn-info hidden">Hiển thị chi tiết</button>
+  
+  <!-- Log Toggle Button -->
+  <button id="logToggleBtn" class="log-toggle-btn" title="Toggle Debug Logs">📋</button>
   
   <div id="details" class="detail-box">
     <div class="detail-row">
@@ -183,7 +323,188 @@
   </div>
 
   <script>
-    // Biến toàn cục để lưu trữ tham số
+    function debugLog(message, data = null) {
+      const timestamp = new Date().toLocaleTimeString();
+      
+      // Chỉ log những thông tin quan trọng
+      const isImportantLog = message.includes('Status changed') || 
+                           message.includes('GetStatus response') ||
+                           message.includes('ERROR') ||
+                           message.includes('DETAILED GetStatus Analysis') ||
+                           message.includes('cleanup') ||
+                           message.includes('refresh completion');
+      
+      if (isImportantLog) {
+        if (data) {
+          console.log(`[DEBUG ${timestamp}]`, message, data);
+        } else {
+          console.log(`[DEBUG ${timestamp}]`, message);
+        }
+        
+        // Thêm log vào UI nếu có log container
+        addToLogDisplay(timestamp, 'DEBUG', message, data);
+      }
+    }
+
+    // Enhanced logging cho Azure Functions calls
+    function logAzureFunctionCall(type, url, options = {}) {
+      const timestamp = new Date().toLocaleTimeString();
+      const logData = {
+        type: type,
+        url: url,
+        method: options.method || 'GET',
+        timestamp: new Date().toISOString(),
+        requestId: globalParams.requestId
+      };
+      
+      console.log(`[AZURE-CALL ${timestamp}] ${type}:`, logData);
+      addToLogDisplay(timestamp, 'AZURE-CALL', `${type}: ${url}`, logData);
+      
+      return logData;
+    }
+
+    // Log Azure Functions response
+    function logAzureFunctionResponse(callData, response, responseTime, data = null) {
+      const timestamp = new Date().toLocaleTimeString();
+      const logData = {
+        ...callData,
+        responseTime: responseTime + 'ms',
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        responseData: data
+      };
+      
+      const logLevel = response.ok ? 'INFO' : 'ERROR';
+      console.log(`[AZURE-RESPONSE ${timestamp}] ${callData.type}:`, logData);
+      addToLogDisplay(timestamp, logLevel, `${callData.type} Response: ${response.status}`, logData);
+      
+      return logData;
+    }
+
+    // Enhanced error handler để filter Chrome DevTools noise
+    function shouldIgnoreError(error, url) {
+      // Ignore Chrome DevTools related requests
+      if (url && (
+        url.includes('.well-known/appspecific') ||
+        url.includes('chrome-extension://') ||
+        url.includes('devtools') ||
+        url.includes('favicon.ico')
+      )) {
+        return true;
+      }
+      
+      // Ignore common browser noise
+      if (error && error.message && (
+        error.message.includes('chrome-extension') ||
+        error.message.includes('devtools') ||
+        error.message.includes('favicon') ||
+        error.message.includes('well-known')
+      )) {
+        return true;
+      }
+      
+      return false;
+    }
+
+    // Enhanced logError với filtering
+    function logError(operation, error, context = {}) {
+      // Filter out noise errors
+      if (shouldIgnoreError(error, context.url || context.statusUrl || context.triggerUrl)) {
+        return; // Don't log Chrome DevTools noise
+      }
+      
+      const timestamp = new Date().toLocaleTimeString();
+      const logData = {
+        operation: operation,
+        error: error.message,
+        stack: error.stack,
+        context: context,
+        timestamp: new Date().toISOString(),
+        requestId: globalParams.requestId
+      };
+      
+      console.error(`[ERROR ${timestamp}] ${operation}:`, logData);
+      addToLogDisplay(timestamp, 'ERROR', `${operation}: ${error.message}`, logData);
+      
+      return logData;
+    }
+
+    // Thêm log vào UI display
+    function addToLogDisplay(timestamp, level, message, data = null) {
+      let logContainer = document.getElementById('logContainer');
+      if (!logContainer) {
+        // Tạo log container nếu chưa có
+        logContainer = document.createElement('div');
+        logContainer.id = 'logContainer';
+        logContainer.className = 'log-container hidden';
+        logContainer.innerHTML = `
+          <div class="log-header">
+            <h4>🔍 Debug Logs</h4>
+            <button id="clearLogs" class="btn-small">Clear</button>
+          </div>
+          <div id="logContent" class="log-content"></div>
+        `;
+        document.body.appendChild(logContainer);
+        
+        // Add clear logs functionality
+        document.getElementById('clearLogs').addEventListener('click', () => {
+          document.getElementById('logContent').innerHTML = '';
+        });
+      }
+      
+      const logContent = document.getElementById('logContent');
+      const logEntry = document.createElement('div');
+      logEntry.className = `log-entry log-${level.toLowerCase()}`;
+      
+      let logText = `[${timestamp}] ${level}: ${message}`;
+      if (data && typeof data === 'object') {
+        logText += `\n${JSON.stringify(data, null, 2)}`;
+      }
+      
+      logEntry.innerHTML = `
+        <div class="log-time">${timestamp}</div>
+        <div class="log-level log-level-${level.toLowerCase()}">${level}</div>
+        <div class="log-message">${message}</div>
+        ${data ? `<div class="log-data"><pre>${JSON.stringify(data, null, 2)}</pre></div>` : ''}
+      `;
+      
+      logContent.appendChild(logEntry);
+      
+      // Auto scroll to bottom
+      logContent.scrollTop = logContent.scrollHeight;
+      
+      // Limit log entries (keep last 50)
+      const entries = logContent.querySelectorAll('.log-entry');
+      if (entries.length > 50) {
+        entries[0].remove();
+      }
+    }
+
+    // Toggle log display
+    function toggleLogDisplay() {
+      const logContainer = document.getElementById('logContainer');
+      if (logContainer) {
+        logContainer.classList.toggle('hidden');
+      }
+    }
+
+    // Detect environment và set API URL
+    function detectEnvironmentAndSetApiUrl() {
+      const hostname = window.location.hostname;
+      
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return `${window.location.protocol}//${hostname}:7071/api`;
+      } else if (hostname.includes('azurewebsites.net')) {
+        return `${window.location.protocol}//${hostname}/api`;
+      } else if (hostname === '' && window.location.protocol === 'file:') {
+        return 'http://localhost:7071/api';
+      } else {
+        return `${window.location.protocol}//${hostname}/api`;
+      }
+    }
+
+    // Global parameters
     let globalParams = {
       groupId: null,
       dataflowId: null,
@@ -191,10 +512,10 @@
       requestId: null,
       autoClose: false,
       showDetails: false,
-      apiBaseUrl: "https://pbirefresh.azurewebsites.net/api"
+      apiBaseUrl: detectEnvironmentAndSetApiUrl()
     };
     
-    // Khởi tạo biến trạng thái
+    // State variables
     let hasDataflow = false;
     let hasDataset = false;
     let isRefreshCompleted = false;
@@ -202,165 +523,28 @@
     let pollTimeoutId = null;
     let triggerUrl = "";
     let statusUrl = "";
+    let currentStatus = "";
+    let previousStatus = ""; // Track previous status để detect changes
+    let previousDataflowStatus = "";
+    let previousDatasetStatus = "";
+    let monitorCount = 0;
+    let timerInterval = null;
 
-    // Tạo requestId nếu không được cung cấp
+    // Generate unique request ID
     function generateRequestId() {
-      return `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      const timestamp = Date.now();
+      const randomPart = Math.random().toString(36).substring(2, 9);
+      return `req_${timestamp}_${randomPart}`;
     }
 
-    // Khởi tạo và kiểm tra tham số
-    async function init() {
-      // Kiểm tra xem form đã được submit bằng POST chưa
-      const formData = await getFormDataFromPost();
-      
-      // Lấy tham số từ URL (GET method)
-      const urlParams = new URLSearchParams(window.location.search);
-      
-      // Ưu tiên lấy tham số từ POST trước, sau đó là GET
-      globalParams.groupId = formData.get("groupId") || urlParams.get("groupId") || null;
-      globalParams.dataflowId = formData.get("dataflowId") || urlParams.get("dataflowId") || null;
-      globalParams.datasetId = formData.get("datasetId") || urlParams.get("datasetId") || null;
-      globalParams.requestId = formData.get("requestId") || urlParams.get("requestId") || generateRequestId();
-      globalParams.autoClose = formData.get("autoClose") === "true" || urlParams.get("autoClose") === "true";
-      globalParams.showDetails = formData.get("showDetails") === "true" || urlParams.get("showDetails") === "true";
-      globalParams.apiBaseUrl = formData.get("apiBaseUrl") || urlParams.get("apiBaseUrl") || "https://pbirefresh.azurewebsites.net/api";
-      
-      // Nếu không có tham số bắt buộc, hiển thị form nhập liệu
-      if (!globalParams.groupId || (!globalParams.dataflowId && !globalParams.datasetId)) {
-        document.getElementById("loader").style.display = "none";
-        document.getElementById("status").textContent = "Vui lòng nhập thông tin để bắt đầu làm mới Power BI";
-        document.getElementById("timer").style.display = "none";
-        document.getElementById("paramForm").classList.remove("hidden");
-        document.getElementById("title").textContent = "Power BI Refresh Tool";
-        
-        // Điền các giá trị đã có vào form
-        if (globalParams.groupId) document.getElementById("groupId").value = globalParams.groupId;
-        if (globalParams.dataflowId) document.getElementById("dataflowId").value = globalParams.dataflowId;
-        if (globalParams.datasetId) document.getElementById("datasetId").value = globalParams.datasetId;
-        if (globalParams.requestId !== generateRequestId()) document.getElementById("requestId").value = globalParams.requestId;
-        if (globalParams.apiBaseUrl !== "https://pbirefresh.azurewebsites.net/api") {
-          document.getElementById("apiBaseUrl").value = globalParams.apiBaseUrl;
-        }
-        document.getElementById("autoClose").checked = globalParams.autoClose;
-        document.getElementById("showDetails").checked = globalParams.showDetails;
-        
-        // Xử lý sự kiện submit form
-        document.getElementById("refreshForm").addEventListener("submit", function(e) {
-          e.preventDefault();
-          
-          const form = e.target;
-          globalParams.groupId = form.elements["groupId"].value;
-          globalParams.dataflowId = form.elements["dataflowId"].value || null;
-          globalParams.datasetId = form.elements["datasetId"].value || null;
-          globalParams.requestId = form.elements["requestId"].value || generateRequestId();
-          globalParams.apiBaseUrl = form.elements["apiBaseUrl"].value || "https://pbirefresh.azurewebsites.net/api";
-          globalParams.autoClose = form.elements["autoClose"].checked;
-          globalParams.showDetails = form.elements["showDetails"].checked;
-          
-          // Kiểm tra tham số bắt buộc
-          if (!globalParams.groupId || (!globalParams.dataflowId && !globalParams.datasetId)) {
-            alert("Vui lòng nhập Workspace ID và ít nhất một trong Dataflow ID hoặc Dataset ID");
-            return;
-          }
-          
-          // Ẩn form và hiển thị giao diện làm mới
-          document.getElementById("paramForm").classList.add("hidden");
-          document.getElementById("loader").style.display = "block";
-          document.getElementById("timer").style.display = "block";
-          document.getElementById("title").textContent = "🔄 Đang làm mới dữ liệu Power BI...";
-          
-          // Khởi tạo quá trình làm mới
-          startRefresh();
-        });
-        
-        return;
-      }
-      
-      // Nếu có đủ tham số, bắt đầu quá trình làm mới
-      startRefresh();
-    }
-    
-    // Lấy dữ liệu từ POST method (nếu có)
-    async function getFormDataFromPost() {
-      // Kiểm tra xem có phải form POST không
-      if (window.location.pathname.includes("refresh-dataset") && document.referrer) {
-        try {
-          // Đây là một cách đơn giản nhận biết POST method, không hoàn hảo
-          // Trong thực tế, bạn cần xử lý phức tạp hơn hoặc dùng server-side script
-          const body = document.body.textContent.trim();
-          if (body && body.includes("=")) {
-            const formData = new URLSearchParams(body);
-            return formData;
-          }
-        } catch (error) {
-          console.warn("Error parsing POST data:", error);
-        }
-      }
-      return new URLSearchParams();
-    }
-    
-    // Cấu hình và bắt đầu quá trình làm mới
-    function startRefresh() {
-      hasDataflow = Boolean(globalParams.dataflowId);
-      hasDataset = Boolean(globalParams.datasetId);
-      
-      // Tạo URL cho các API
-      triggerUrl = `${globalParams.apiBaseUrl}/TriggerRefresh?groupId=${globalParams.groupId}&dataflowId=${globalParams.dataflowId || ''}&datasetId=${globalParams.datasetId || ''}&requestId=${globalParams.requestId}`;
-      statusUrl = `${globalParams.apiBaseUrl}/CheckRefreshStatus?requestId=${globalParams.requestId}`;
-      
-      // Hiển thị/ẩn dòng trong chi tiết
-      document.getElementById('row-dataflowId').style.display = hasDataflow ? 'flex' : 'none';
-      document.getElementById('row-datasetId').style.display = hasDataset ? 'flex' : 'none';
-      
-      // Điền thông tin cơ bản
-      document.getElementById('detail-requestId').textContent = globalParams.requestId;
-      document.getElementById('detail-groupId').textContent = globalParams.groupId;
-      document.getElementById('detail-dataflowId').textContent = globalParams.dataflowId || 'N/A';
-      document.getElementById('detail-datasetId').textContent = globalParams.datasetId || 'N/A';
-      
-      // Hiển thị chi tiết nếu được yêu cầu
-      if (globalParams.showDetails) {
-        document.getElementById('details').style.display = 'block';
-      } else {
-        document.getElementById('toggleDetails').classList.remove('hidden');
-      }
-      
-      // Bắt sự kiện khi click nút hiển thị chi tiết
-      document.getElementById('toggleDetails').addEventListener('click', function() {
-        const detailsBox = document.getElementById('details');
-        if (detailsBox.style.display === 'block') {
-          detailsBox.style.display = 'none';
-          this.textContent = 'Hiển thị chi tiết';
-        } else {
-          detailsBox.style.display = 'block';
-          this.textContent = 'Ẩn chi tiết';
-        }
-      });
-      
-      // Khởi động bộ đếm thời gian
-      startTimer();
-      
-      // Bắt đầu quá trình làm mới
-      refreshPowerBI();
+    // Validate GUID format
+    function isValidGuid(guid) {
+      if (!guid) return false;
+      const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      return guidRegex.test(guid);
     }
 
-    // Hiển thị đồng hồ đếm ngược / thời gian chờ
-    function startTimer() {
-      let seconds = 0;
-      const timerEl = document.getElementById("timer");
-      const timerInterval = setInterval(() => {
-        seconds++;
-        timerEl.textContent = `⏱ Đã chờ: ${Math.floor(seconds/60)} phút ${seconds%60} giây`;
-        
-        // Tự động đóng cửa sổ nếu đã hoàn thành và yêu cầu tự động đóng
-        if (isRefreshCompleted && globalParams.autoClose && seconds % 60 === 0) {
-          clearInterval(timerInterval);
-          window.close();
-        }
-      }, 1000);
-    }
-
-    // Tạo badge cho trạng thái
+    // Create status badge
     function createStatusBadge(status) {
       if (!status) return '';
       
@@ -378,145 +562,665 @@
       return `<span class="badge ${badgeClass}">${status}</span>`;
     }
 
-    // Gửi yêu cầu làm mới
-    async function refreshPowerBI() {
-      document.getElementById("status").textContent = "🚀 Gửi yêu cầu làm mới Power BI...";
+    // Initialize application
+    async function init() {
+      debugLog("Khởi tạo ứng dụng (version 2.1.1 - FIXED)...");
+      
+      // Get parameters from URL
+      const urlParams = new URLSearchParams(window.location.search);
+      
+      globalParams.groupId = urlParams.get("groupId") || null;
+      globalParams.dataflowId = urlParams.get("dataflowId") || null;
+      globalParams.datasetId = urlParams.get("datasetId") || null;
+      globalParams.requestId = urlParams.get("requestId") || generateRequestId();
+      globalParams.autoClose = urlParams.get("autoClose") === "true";
+      globalParams.showDetails = urlParams.get("showDetails") === "true";
+      globalParams.apiBaseUrl = urlParams.get("apiBaseUrl") || detectEnvironmentAndSetApiUrl();
+      
+      debugLog("Tham số khởi tạo:", globalParams);
+      
+      // Validate required parameters
+      const hasRequiredParams = globalParams.groupId && (globalParams.dataflowId || globalParams.datasetId);
+      
+      let validationErrors = [];
+      if (globalParams.groupId && !isValidGuid(globalParams.groupId)) {
+        validationErrors.push("Workspace ID không đúng định dạng GUID");
+      }
+      if (globalParams.dataflowId && !isValidGuid(globalParams.dataflowId)) {
+        validationErrors.push("Dataflow ID không đúng định dạng GUID");
+      }
+      if (globalParams.datasetId && !isValidGuid(globalParams.datasetId)) {
+        validationErrors.push("Dataset ID không đúng định dạng GUID");
+      }
+      
+      if (!hasRequiredParams || validationErrors.length > 0) {
+        showParameterForm(validationErrors);
+        return;
+      }
+      
+      // Start refresh process
+      startRefresh();
+    }
+
+    // Show parameter input form
+    function showParameterForm(errors = []) {
+      document.getElementById("loader").style.display = "none";
+      document.getElementById("status").textContent = errors.length > 0 
+        ? `Lỗi: ${errors.join(", ")}` 
+        : "Vui lòng nhập thông tin để bắt đầu làm mới Power BI";
+      document.getElementById("timer").style.display = "none";
+      document.getElementById("paramForm").classList.remove("hidden");
+      document.getElementById("title").textContent = "Power BI Refresh Tool";
+      
+      // Fill existing values
+      if (globalParams.groupId) document.getElementById("groupId").value = globalParams.groupId;
+      if (globalParams.dataflowId) document.getElementById("dataflowId").value = globalParams.dataflowId;
+      if (globalParams.datasetId) document.getElementById("datasetId").value = globalParams.datasetId;
+      
+      // Handle form submission
+      document.getElementById("refreshForm").addEventListener("submit", function(e) {
+        e.preventDefault();
+        
+        const form = e.target;
+        globalParams.groupId = form.elements["groupId"].value;
+        globalParams.dataflowId = form.elements["dataflowId"].value || null;
+        globalParams.datasetId = form.elements["datasetId"].value || null;
+        globalParams.requestId = form.elements["requestId"].value || generateRequestId();
+        globalParams.apiBaseUrl = form.elements["apiBaseUrl"].value || detectEnvironmentAndSetApiUrl();
+        
+        // Validate
+        let formErrors = [];
+        if (!globalParams.groupId) {
+          formErrors.push("Workspace ID là bắt buộc");
+        } else if (!isValidGuid(globalParams.groupId)) {
+          formErrors.push("Workspace ID không đúng định dạng GUID");
+        }
+        
+        if (!globalParams.groupId || (!globalParams.dataflowId && !globalParams.datasetId)) {
+          formErrors.push("Vui lòng nhập Workspace ID và ít nhất một trong Dataflow ID hoặc Dataset ID");
+        }
+        
+        if (formErrors.length > 0) {
+          alert(formErrors.join("\n"));
+          return;
+        }
+        
+        // Hide form and start refresh
+        document.getElementById("paramForm").classList.add("hidden");
+        document.getElementById("loader").style.display = "block";
+        document.getElementById("timer").style.display = "block";
+        document.getElementById("title").textContent = "🔄 Đang làm mới dữ liệu Power BI...";
+        
+        startRefresh();
+      });
+    }
+
+    // Start refresh process
+    function startRefresh() {
+      debugLog("🚀 Starting refresh process", {
+        hasDataflow: hasDataflow,
+        hasDataset: hasDataset,
+        requestId: globalParams.requestId
+      });
+      
+      hasDataflow = Boolean(globalParams.dataflowId);
+      hasDataset = Boolean(globalParams.datasetId);
+      
+      // Create API URLs - FIXED: Use GetStatus instead of CheckRefreshStatus
+      triggerUrl = `${globalParams.apiBaseUrl}/TriggerRefresh?groupId=${globalParams.groupId}&dataflowId=${globalParams.dataflowId || ''}&datasetId=${globalParams.datasetId || ''}&requestId=${globalParams.requestId}`;
+      statusUrl = `${globalParams.apiBaseUrl}/GetStatus?requestId=${globalParams.requestId}`;
+      
+      // Update UI
+      document.getElementById('row-dataflowId').style.display = hasDataflow ? 'flex' : 'none';
+      document.getElementById('row-datasetId').style.display = hasDataset ? 'flex' : 'none';
+      
+      document.getElementById('detail-requestId').textContent = globalParams.requestId;
+      document.getElementById('detail-groupId').textContent = globalParams.groupId;
+      document.getElementById('detail-dataflowId').textContent = globalParams.dataflowId || 'N/A';
+      document.getElementById('detail-datasetId').textContent = globalParams.datasetId || 'N/A';
+      
+      if (globalParams.showDetails) {
+        document.getElementById('details').style.display = 'block';
+      } else {
+        document.getElementById('toggleDetails').classList.remove('hidden');
+      }
+      
+      document.getElementById('toggleDetails').addEventListener('click', function() {
+        const detailsBox = document.getElementById('details');
+        if (detailsBox.style.display === 'block') {
+          detailsBox.style.display = 'none';
+          this.textContent = 'Hiển thị chi tiết';
+        } else {
+          detailsBox.style.display = 'block';
+          this.textContent = 'Ẩn chi tiết';
+        }
+      });
+      
+      startTimer();
+      triggerRefreshAndStartMonitoring();
+    }
+
+    // Trigger refresh and start monitoring in parallel
+    async function triggerRefreshAndStartMonitoring() {
+      debugLog("🚀 Starting parallel refresh & monitoring");
+      
+      document.getElementById("status").textContent = "🚀 Đang gửi yêu cầu làm mới dữ liệu...";
+      document.getElementById("message").textContent = "Kết nối đến Azure Functions...";
+      
+      // Bắt đầu status monitoring NGAY LẬP TỨC (không chờ TriggerRefresh)
+      startStatusMonitoring();
+      
+      // Gọi TriggerRefresh song song (không chờ response)
+      triggerRefreshInBackground();
+    }
+
+    // Trigger refresh in background (không block UI)
+    async function triggerRefreshInBackground() {
       try {
-        const res = await fetchWithTimeout(triggerUrl, { method: "GET" }, 180000);
-        if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(`HTTP ${res.status}: ${errorText}`);
+        // Log Azure Function call
+        const callStartTime = performance.now();
+        const callData = logAzureFunctionCall('TriggerRefresh', triggerUrl, { method: 'GET' });
+        
+        const response = await fetch(triggerUrl, {
+          method: 'GET',
+          cache: 'no-store'
+        });
+        
+        const responseTime = Math.round(performance.now() - callStartTime);
+        
+        let responseData = {};
+        let responseText = '';
+        
+        try {
+          responseText = await response.text();
+          if (responseText && responseText.trim().length > 0) {
+            responseData = JSON.parse(responseText);
+          }
+        } catch (parseError) {
+          responseData = { rawResponse: responseText };
         }
         
-        const result = await res.json();
+        // Log Azure Function response
+        logAzureFunctionResponse(callData, response, responseTime, responseData);
         
-        if (!result || result.error) {
-          throw new Error(result.error || "Không nhận được phản hồi hợp lệ từ server");
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${responseText}`);
         }
         
-        document.getElementById("status").textContent = "✅ Yêu cầu làm mới đã được gửi. Đang theo dõi...";
-        document.getElementById('detail-status').innerHTML = 
-          (hasDataflow ? `Dataflow: ${createStatusBadge(result.status || "Waiting")}<br>` : '') +
-          (hasDataset ? `Dataset: ${createStatusBadge(result.status || "Waiting")}` : '');
+        // Update UI với thông báo trigger thành công (không thay đổi monitoring)
+        if (!isRefreshCompleted) {
+          document.getElementById("message").textContent = responseData.message || "✅ Đã gửi yêu cầu thành công, đang theo dõi...";
+        }
         
-        // Cập nhật trạng thái
-        pollStatus();
-      } catch (err) {
-        showError("gửi yêu cầu làm mới", err);
+      } catch (error) {
+        logError("TriggerRefresh", error, { 
+          triggerUrl, 
+          requestId: globalParams.requestId,
+          groupId: globalParams.groupId 
+        });
+        
+        // Nếu TriggerRefresh thất bại, vẫn tiếp tục monitoring (có thể refresh đã bắt đầu từ trước)
+        if (!isRefreshCompleted) {
+          document.getElementById("message").textContent = `⚠️ Lỗi trigger: ${error.message}. Vẫn đang theo dõi trạng thái...`;
+        }
       }
     }
 
-    // Hàm chung để poll trạng thái với retry logic
-    async function pollStatus() {
+    // Start status monitoring immediately
+    async function startStatusMonitoring() {
+      document.getElementById("status").textContent = "⏳ Đang theo dõi trạng thái...";
+      document.getElementById("message").textContent = "Kiểm tra tiến trình làm mới (song song với trigger)...";
+      
+      // Bắt đầu monitoring NGAY LẬP TỨC (chỉ chờ 1 giây để UI cập nhật)
+      setTimeout(monitorStatus, 1000); // Giảm từ 3s xuống 1s
+    }
+
+    // Monitor status loop
+    async function monitorStatus() {
+      if (isRefreshCompleted || monitorCount >= 100) {
+        debugLog("Kết thúc monitoring");
+        return;
+      }
+      
+      monitorCount++;
+      debugLog(`📊 GetStatus check #${monitorCount}`, { statusUrl, attempt: monitorCount });
+      
       try {
-        const res = await fetch(statusUrl);
-        if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(`HTTP ${res.status}: ${errorText}`);
+        // Log Azure Function call
+        const callStartTime = performance.now();
+        const callData = logAzureFunctionCall('GetStatus', statusUrl, { method: 'GET' });
+        
+        const response = await fetch(statusUrl, {
+          method: 'GET',
+          cache: 'no-store'
+        });
+        
+        const responseTime = Math.round(performance.now() - callStartTime);
+        debugLog(`GetStatus response: ${response.status} (${responseTime}ms)`);
+        
+        if (response.status === 404) {
+          // Log 404 as info, không phải error
+          logAzureFunctionResponse(callData, response, responseTime, { message: "Status chưa có sẵn" });
+          document.getElementById("message").textContent = `Đang khởi tạo (${monitorCount})...`;
+          pollTimeoutId = setTimeout(monitorStatus, 10000); // Giữ 10s cho 404
+          return;
         }
         
-        const data = await res.json();
-        if (!data || data.error) {
-          throw new Error(data.error || "Không nhận được phản hồi hợp lệ từ server");
-        }
-        
-        // Cập nhật thời gian
-        if (data.lastUpdated) {
-          document.getElementById('detail-lastUpdated').textContent = new Date(data.lastUpdated).toLocaleString();
-        }
-        
-        // Hiển thị trạng thái
-        let statusText = "";
-        let detailStatusHtml = "";
-        
-        // Xử lý dataflow nếu có
-        if (hasDataflow && data.dataflowId) {
-          statusText += `⏳ Dataflow: ${data.status || "Đang chờ"}`;
-          detailStatusHtml += `Dataflow: ${createStatusBadge(data.status || "Waiting")}`;
-          
-          if (data.status === "DataflowCompleted" || data.status === "DataflowSuccess") {
-            statusText += " ✅";
-          } else if (data.status === "DataflowFailed" || data.status === "DataflowTimeout") {
-            statusText += " ❌";
-            refreshFailed = true;
+        let data = null;
+        if (response.ok) {
+          try {
+            data = await response.json();
+            
+            // ENHANCED DEBUG: Log exact field values từ server - CHỈ KHI CẦN
+            if (monitorCount <= 3 || data.status !== previousStatus) {
+              debugLog("🔍 DETAILED GetStatus Analysis:", {
+                "Raw data.status": data.status,
+                "Raw data.dataflowStatus": data.dataflowStatus, 
+                "Raw data.datasetStatus": data.datasetStatus,
+                "Raw data.message": data.message,
+                "Raw data.isCompleted": data.isCompleted,
+                "Type of data.status": typeof data.status,
+                "Status is truthy": !!data.status,
+                "Status !== 'Waiting'": data.status !== 'Waiting'
+              });
+            }
+            
+          } catch (parseError) {
+            logError("ParseGetStatusResponse", parseError, { 
+              statusUrl, 
+              responseStatus: response.status,
+              attempt: monitorCount 
+            });
+            throw new Error(`Không thể parse JSON response: ${parseError.message}`);
           }
         }
         
-        // Xử lý dataset nếu có
-        if (hasDataset && data.datasetId) {
-          if (statusText) statusText += "<br>";
-          if (detailStatusHtml) detailStatusHtml += "<br>";
-          
-          statusText += `⏳ Dataset: ${data.status || "Đang chờ"}`;
-          detailStatusHtml += `Dataset: ${createStatusBadge(data.status || "Waiting")}`;
-          
-          if (data.status === "DatasetCompleted" || data.status === "DatasetSuccess") {
-            statusText += " ✅";
-          } else if (data.status === "DatasetFailed" || data.status === "DatasetTimeout") {
-            statusText += " ❌";
-            refreshFailed = true;
-          }
+        // Log Azure Function response
+        logAzureFunctionResponse(callData, response, responseTime, data);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
         }
         
-        // Cập nhật trạng thái
-        document.getElementById("status").innerHTML = statusText;
-        document.getElementById('detail-status').innerHTML = detailStatusHtml;
+        // Check for status changes và cập nhật UI ngay lập tức
+        const hasStatusChanged = detectAndHandleStatusChange(data);
         
-        // Kiểm tra nếu quá trình đã hoàn thành
-        if (data.isCompleted) {
+        // Update status display (always update cho latest info)
+        updateStatusDisplay(data);
+        
+        // Log brief summary nếu có status change
+        if (hasStatusChanged) {
+          debugLog("🔄 Status đã được cập nhật trong UI");
+        }
+        
+        // Check if completed - CHỈ CLEANUP KHI TẤT CẢ ĐÃ COMPLETE
+        const isAllCompleted = checkIfAllRefreshCompleted(data);
+        
+        if (isAllCompleted) {
+          debugLog("🎯 Refresh completion detected", { 
+            finalStatus: data.status, 
+            attempts: monitorCount,
+            isCompleted: data.isCompleted,
+            dataflowStatus: data.dataflowStatus,
+            datasetStatus: data.datasetStatus,
+            hasDataflow: hasDataflow,
+            hasDataset: hasDataset
+          });
+          
           isRefreshCompleted = true;
           
-          if (refreshFailed) {
-            document.getElementById("title").textContent = "❌ Làm mới thất bại!";
-            document.getElementById("status").innerHTML += "<br><br>Có lỗi xảy ra trong quá trình làm mới.";
-          } else {
-            document.getElementById("title").textContent = "✅ Làm mới hoàn tất!";
-            document.getElementById("status").innerHTML += "<br><br>Toàn bộ quá trình làm mới đã hoàn tất thành công.";
-            
-            // Tự động đóng sau 3 giây nếu được yêu cầu
-            if (globalParams.autoClose) {
-              setTimeout(() => window.close(), 3000);
-            }
-          }
+          // Update final UI state
+          const hasFailed = data.status && (data.status.includes('Failed') || data.status.includes('Error'));
+          document.getElementById("title").textContent = hasFailed ? "❌ Làm mới thất bại!" : "✅ Làm mới hoàn tất!";
           
-          document.querySelector(".loader").style.display = "none";
-        } else {
-          // Tiếp tục poll sau 30 giây nếu chưa hoàn thành
-          const pollInterval = hasDataflow ? 60000 : 30000; // 60s cho dataflow, 30s cho dataset
-          pollTimeoutId = setTimeout(pollStatus, pollInterval);
+          // Perform cleanup
+          performCleanup();
+          
+          // Auto close if configured
+          if (globalParams.autoClose && !hasFailed) {
+            setTimeout(() => window.close(), 3000);
+          }
+          return;
         }
-      } catch (err) {
-        // Thử lại sau 30 giây nếu có lỗi
-        document.getElementById("status").innerHTML += "<br>⚠️ Đang thử lại kết nối...";
-        pollTimeoutId = setTimeout(pollStatus, 30000);
+        
+        // Continue monitoring với 30s interval
+        pollTimeoutId = setTimeout(monitorStatus, 30000); // Tăng từ 15s lên 30s
+        
+      } catch (error) {
+        logError("MonitorStatus", error, {
+          statusUrl,
+          attempt: monitorCount,
+          requestId: globalParams.requestId
+        });
+        
+        // Handle eTag mismatch errors (409 Conflict) from SharePoint
+        if (error.message.includes('409') || 
+            error.message.includes('eTag mismatch') || 
+            error.message.includes('resourceModified') ||
+            error.message.includes('resource has changed')) {
+          debugLog("Phát hiện lỗi eTag mismatch SharePoint, tự động retry...");
+          document.getElementById("message").textContent = `⚠️ SharePoint đang được cập nhật đồng thời, đang thử lại... (${monitorCount})`;
+          
+          // Retry với delay ngắn hơn cho eTag conflicts
+          if (monitorCount < 100) {
+            pollTimeoutId = setTimeout(monitorStatus, 5000); // Giữ 5s cho eTag conflicts
+          }
+          return;
+        }
+        
+        document.getElementById("message").textContent = `Lỗi khi kiểm tra trạng thái: ${error.message}`;
+        
+        // Retry after delay - tăng error retry lên 30s
+        if (monitorCount < 100) {
+          pollTimeoutId = setTimeout(monitorStatus, 30000); // Tăng từ 20s lên 30s
+        }
       }
     }
 
-    // Fetch có timeout
-    function fetchWithTimeout(resource, options = {}, timeout = 60000) {
-      const controller = new AbortController();
-      const id = setTimeout(() => controller.abort(), timeout);
-      return fetch(resource, { ...options, signal: controller.signal })
-        .finally(() => clearTimeout(id));
+    // Update status display - SIMPLIFIED VERSION - CHỈ HIỂN THỊ STATUS HIỆN TẠI
+    function updateStatusDisplay(data) {
+      // Debug log để kiểm tra data nhận được
+      debugLog("updateStatusDisplay received data:", {
+        status: data.status,
+        dataflowStatus: data.dataflowStatus,
+        datasetStatus: data.datasetStatus,
+        message: data.message,
+        hasDataflow: hasDataflow,
+        hasDataset: hasDataset,
+        isCompleted: data.isCompleted
+      });
+      
+      let statusText = "";
+      let messageText = data.message || "Đang xử lý...";
+      
+      // LOGIC ĐƠN GIẢN: CHỈ HIỂN THỊ STATUS HIỆN TẠI
+      if (data.status) {
+        // Nếu có specific status active (không phải Waiting), hiển thị exact đó
+        if (data.dataflowStatus && data.dataflowStatus !== 'Waiting' && data.dataflowStatus !== '') {
+          // Đang process dataflow - chỉ hiển thị dataflow
+          statusText = `Dataflow: ${createStatusBadge(data.dataflowStatus)}`;
+        } else if (data.datasetStatus && data.datasetStatus !== 'Waiting' && data.datasetStatus !== '') {
+          // Đang process dataset - chỉ hiển thị dataset  
+          statusText = `Dataset: ${createStatusBadge(data.datasetStatus)}`;
+        } else {
+          // Fallback: hiển thị main status với type label nếu có
+          if (hasDataflow && !hasDataset) {
+            // Chỉ có dataflow
+            statusText = `Dataflow: ${createStatusBadge(data.status)}`;
+          } else if (hasDataset && !hasDataflow) {
+            // Chỉ có dataset
+            statusText = `Dataset: ${createStatusBadge(data.status)}`;
+          } else if (hasDataflow && hasDataset) {
+            // Có cả hai - hiển thị main status với label general
+            statusText = `Status: ${createStatusBadge(data.status)}`;
+          } else {
+            // Không có specific type
+            statusText = createStatusBadge(data.status);
+          }
+        }
+      } else {
+        // Fallback nếu không có status
+        statusText = "Đang chờ thông tin...";
+      }
+      
+      // Cập nhật UI elements
+      document.getElementById("status").innerHTML = statusText;
+      document.getElementById("message").textContent = messageText;
+      document.getElementById("detail-status").innerHTML = statusText;
+      
+      // Cập nhật lastUpdated nếu có
+      if (data.lastUpdated) {
+        document.getElementById('detail-lastUpdated').textContent = new Date(data.lastUpdated).toLocaleString();
+      }
+      
+      // Log kết quả để debug
+      debugLog("Status display updated:", {
+        statusText: statusText,
+        messageText: messageText,
+        actualStatusFromServer: data.status,
+        dataflowStatusFromServer: data.dataflowStatus,
+        datasetStatusFromServer: data.datasetStatus
+      });
     }
 
-    // Hiển thị lỗi
-    function showError(context, err) {
-      document.getElementById("title").textContent = "❌ Có lỗi xảy ra";
-      document.getElementById("status").textContent = `Lỗi khi ${context}: ${err.message}`;
+    // Start timer
+    function startTimer() {
+      let seconds = 0;
+      const timerEl = document.getElementById("timer");
+      
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
+      
+      timerInterval = setInterval(() => {
+        seconds++;
+        timerEl.textContent = `⏱ Đã chờ: ${Math.floor(seconds/60)} phút ${seconds%60} giây`;
+      }, 1000);
+    }
+
+    // Cleanup
+    window.addEventListener('beforeunload', () => {
+      if (pollTimeoutId) clearTimeout(pollTimeoutId);
+      if (timerInterval) clearInterval(timerInterval);
+    });
+    
+    // Global error handlers để filter noise
+    window.addEventListener('error', function(event) {
+      // Filter out Chrome DevTools và browser noise
+      if (shouldIgnoreError(event.error, event.filename)) {
+        event.preventDefault(); // Prevent console spam
+        return;
+      }
+      
+      // Log only important errors
+      logError('GlobalError', event.error, {
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno
+      });
+    });
+
+    window.addEventListener('unhandledrejection', function(event) {
+      // Filter out Chrome DevTools noise
+      if (event.reason && shouldIgnoreError(event.reason, '')) {
+        event.preventDefault();
+        return;
+      }
+      
+      logError('UnhandledPromiseRejection', event.reason, {
+        type: 'promise_rejection'
+      });
+    });
+
+    // Initialize when DOM ready
+    document.addEventListener('DOMContentLoaded', init);
+    
+    // Initialize log system
+    document.addEventListener('DOMContentLoaded', function() {
+      // Add log toggle functionality
+      const logToggleBtn = document.getElementById('logToggleBtn');
+      if (logToggleBtn) {
+        logToggleBtn.addEventListener('click', toggleLogDisplay);
+      }
+      
+      // Initial log entry
+      debugLog("Application initialized", {
+        version: "2.1.1 - FIXED",
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        url: window.location.href
+      });
+    });
+
+    // Detect status changes và trigger immediate UI updates - SIMPLIFIED
+    function detectAndHandleStatusChange(data) {
+      let hasChanged = false;
+      
+      // Debug current vs previous
+      debugLog("detectAndHandleStatusChange checking:", {
+        currentStatus: data.status,
+        previousStatus: previousStatus,
+        currentDataflowStatus: data.dataflowStatus,
+        previousDataflowStatus: previousDataflowStatus,
+        currentDatasetStatus: data.datasetStatus,
+        previousDatasetStatus: previousDatasetStatus
+      });
+      
+      // Check main status change (most important)
+      if (data.status && data.status !== previousStatus) {
+        hasChanged = true;
+        debugLog(`📊 Main Status changed: "${previousStatus}" → "${data.status}"`);
+        
+        // Update message dựa trên status
+        if (data.status.toLowerCase().includes('refreshing') || data.status.toLowerCase().includes('running')) {
+          document.getElementById("message").textContent = "🔄 Đang thực hiện refresh...";
+        } else if (data.status.toLowerCase().includes('completed') || data.status.toLowerCase().includes('success')) {
+          document.getElementById("message").textContent = "✅ Refresh hoàn tất!";
+        } else if (data.status.toLowerCase().includes('failed') || data.status.toLowerCase().includes('error')) {
+          document.getElementById("message").textContent = "❌ Refresh thất bại!";
+        } else if (data.status.toLowerCase().includes('waiting')) {
+          document.getElementById("message").textContent = "⏳ Đang chờ xử lý...";
+        }
+        
+        previousStatus = data.status;
+      }
+      
+      // Check dataflow status change
+      if (data.dataflowStatus && data.dataflowStatus !== previousDataflowStatus) {
+        hasChanged = true;
+        debugLog(`📊 Dataflow status changed: "${previousDataflowStatus}" → "${data.dataflowStatus}"`);
+        previousDataflowStatus = data.dataflowStatus;
+      }
+      
+      // Check dataset status change
+      if (data.datasetStatus && data.datasetStatus !== previousDatasetStatus) {
+        hasChanged = true;
+        debugLog(`📊 Dataset status changed: "${previousDatasetStatus}" → "${data.datasetStatus}"`);
+        previousDatasetStatus = data.datasetStatus;
+      }
+      
+      // Trigger visual feedback nếu có change
+      if (hasChanged) {
+        debugLog("🔄 Status change detected - triggering visual feedback");
+        
+        // Visual indicator
+        const statusElement = document.getElementById("status");
+        if (statusElement) {
+          statusElement.style.transition = "all 0.3s ease";
+          statusElement.style.transform = "scale(1.02)";
+          statusElement.style.boxShadow = "0 0 10px rgba(40, 167, 69, 0.3)";
+          
+          setTimeout(() => {
+            statusElement.style.transform = "scale(1)";
+            statusElement.style.boxShadow = "none";
+          }, 500);
+        }
+        
+        // Log the change
+        addToLogDisplay(new Date().toLocaleTimeString(), 'INFO', 'Status Change Detected', {
+          previous: {
+            main: previousStatus,
+            dataflow: previousDataflowStatus,
+            dataset: previousDatasetStatus
+          },
+          current: {
+            main: data.status,
+            dataflow: data.dataflowStatus,
+            dataset: data.datasetStatus
+          },
+          monitorAttempt: monitorCount
+        });
+      } else {
+        debugLog("No status changes detected this cycle");
+      }
+      
+      return hasChanged;
+    }
+
+    // Cleanup function khi refresh hoàn tất
+    function performCleanup() {
+      debugLog("🧹 Performing cleanup after refresh completion");
+      
+      // Clear all timers
+      if (pollTimeoutId) {
+        clearTimeout(pollTimeoutId);
+        pollTimeoutId = null;
+      }
+      
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+      
+      // Stop monitoring
+      isRefreshCompleted = true;
+      
+      // Update UI elements
       document.querySelector(".loader").style.display = "none";
       
-      // Cập nhật chi tiết
-      document.getElementById('detail-status').innerHTML = `<span class="badge badge-danger">Lỗi</span>`;
-      document.getElementById('detail-lastUpdated').textContent = new Date().toLocaleString();
-      
-      // Hiển thị chi tiết nếu có lỗi
-      document.getElementById('details').style.display = 'block';
-      document.getElementById('toggleDetails').classList.add('hidden');
+      debugLog("✅ Cleanup completed - all timers cleared");
     }
-    
-    // Khởi tạo trang web
-    init();
+
+    // Check if all components are completed
+    function checkIfAllRefreshCompleted(data) {
+      // Nếu server báo isCompleted = true, trust server
+      if (data.isCompleted === true) {
+        return true;
+      }
+      
+      // Check status strings cho completion/failure
+      const mainStatusCompleted = data.status && (
+        data.status.includes('Completed') || 
+        data.status.includes('Failed') || 
+        data.status.includes('Success') ||
+        data.status.includes('Error')
+      );
+      
+      // Nếu chỉ có dataflow
+      if (hasDataflow && !hasDataset) {
+        const dataflowCompleted = data.dataflowStatus && (
+          data.dataflowStatus.includes('Completed') ||
+          data.dataflowStatus.includes('Failed') ||
+          data.dataflowStatus.includes('Success') ||
+          data.dataflowStatus.includes('Error')
+        );
+        return dataflowCompleted || mainStatusCompleted;
+      }
+      
+      // Nếu chỉ có dataset  
+      if (hasDataset && !hasDataflow) {
+        const datasetCompleted = data.datasetStatus && (
+          data.datasetStatus.includes('Completed') ||
+          data.datasetStatus.includes('Failed') ||
+          data.datasetStatus.includes('Success') ||
+          data.datasetStatus.includes('Error')
+        );
+        return datasetCompleted || mainStatusCompleted;
+      }
+      
+      // Nếu có cả dataflow và dataset
+      if (hasDataflow && hasDataset) {
+        const dataflowCompleted = data.dataflowStatus && (
+          data.dataflowStatus.includes('Completed') ||
+          data.dataflowStatus.includes('Failed') ||
+          data.dataflowStatus.includes('Success') ||
+          data.dataflowStatus.includes('Error')
+        );
+        
+        const datasetCompleted = data.datasetStatus && (
+          data.datasetStatus.includes('Completed') ||
+          data.datasetStatus.includes('Failed') ||
+          data.datasetStatus.includes('Success') ||
+          data.datasetStatus.includes('Error')
+        );
+        
+        // CẢ HAI phải complete mới được cleanup
+        return (dataflowCompleted && datasetCompleted) || mainStatusCompleted;
+      }
+      
+      // Fallback: chỉ dựa vào main status
+      return mainStatusCompleted;
+    }
   </script>
 </body>
-</html>
+</html> 
