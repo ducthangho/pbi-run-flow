@@ -493,15 +493,45 @@
     function detectEnvironmentAndSetApiUrl() {
       const hostname = window.location.hostname;
       
+      // PRODUCTION URLS - CẬP NHẬT SAU KHI DEPLOY AZURE FUNCTIONS
+      const PRODUCTION_API_URLS = [
+        // Thêm Azure Functions URL của bạn vào đây sau khi deploy
+        // 'https://your-function-app-name.azurewebsites.net/api',
+        'https://pbirefresh-app.azurewebsites.net/api',  // Default fallback
+      ];
+      
+      // Github Pages hosting - use first production URL
+      if (hostname.includes('github.io')) {
+        return PRODUCTION_API_URLS[0];
+      }
+      
+      // Azure Static Web Apps hosting
+      if (hostname.includes('azurestaticapps.net')) {
+        return PRODUCTION_API_URLS[0];
+      }
+      
+      // Azure Web Apps hosting (nếu host cả frontend và backend trên Azure)
+      if (hostname.includes('azurewebsites.net')) {
+        // Nếu đây là backend Azure Functions, sử dụng local API
+        if (window.location.pathname.includes('/api/')) {
+          return `${window.location.protocol}//${hostname}/api`;
+        }
+        // Nếu đây là frontend trên Azure Web Apps, sử dụng production API
+        return PRODUCTION_API_URLS[0];
+      }
+      
+      // Local development environments
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
         return `${window.location.protocol}//${hostname}:7071/api`;
-      } else if (hostname.includes('azurewebsites.net')) {
-        return `${window.location.protocol}//${hostname}/api`;
-      } else if (hostname === '' && window.location.protocol === 'file:') {
+      } 
+      
+      // File protocol (local file) - development
+      if (hostname === '' && window.location.protocol === 'file:') {
         return 'http://localhost:7071/api';
-      } else {
-        return `${window.location.protocol}//${hostname}/api`;
-      }
+      } 
+      
+      // Custom domains hoặc other hosting - sử dụng production
+      return PRODUCTION_API_URLS[0];
     }
 
     // Global parameters
