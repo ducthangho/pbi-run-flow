@@ -599,9 +599,10 @@
       // Get parameters from URL
       const urlParams = new URLSearchParams(window.location.search);
       
-      globalParams.groupId = urlParams.get("groupId") || null;
-      globalParams.dataflowId = urlParams.get("dataflowId") || null;
-      globalParams.datasetId = urlParams.get("datasetId") || null;
+      // FIXED: Support both old and new parameter formats
+      globalParams.groupId = urlParams.get("groupId") || urlParams.get("groupIdForRefreshDataflow") || null;
+      globalParams.dataflowId = urlParams.get("dataflowId") || urlParams.get("dataflowIdForRefreshDataflow") || null;
+      globalParams.datasetId = urlParams.get("datasetId") || urlParams.get("datasetIdForRefreshDataflow") || null;
       globalParams.requestId = urlParams.get("requestId") || generateRequestId();
       globalParams.autoClose = urlParams.get("autoClose") === "true";
       globalParams.showDetails = urlParams.get("showDetails") === "true";
