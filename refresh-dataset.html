@@ -646,6 +646,24 @@
         </div>
       </div>
     </div>
+  </main>
+
+  <!-- Log Toggle Button -->
+  <button id="logToggleBtn" class="log-toggle-btn" title="Nhật ký gỡ lỗi">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <polyline points="4 17 10 11 4 5"></polyline>
+      <line x1="12" y1="19" x2="20" y2="19"></line>
+    </svg>
+  </button>
+
+  <!-- Log Container -->
+  <div id="logContainer" class="log-container hidden">
+    <div class="log-header">
+      <h4>🔍 Debug Logs</h4>
+      <button id="clearLogs" class="btn-small">Clear</button>
+    </div>
+    <div id="logContent" class="log-content"></div>
+  </div>
 
   <script>
     // Helper to update progress bar smoothly
@@ -1455,8 +1473,17 @@
         logToggleBtn.addEventListener('click', toggleLogDisplay);
       }
 
+      // Add clear logs functionality
+      const clearLogsBtn = document.getElementById('clearLogs');
+      if (clearLogsBtn) {
+        clearLogsBtn.addEventListener('click', () => {
+          const logContent = document.getElementById('logContent');
+          if (logContent) logContent.innerHTML = '';
+        });
+      }
+
       // Initial log entry
-      debugLog("Application initialized", {
+      addToLogDisplay(new Date().toLocaleTimeString(), 'INFO', 'Application initialized', {
         version: "2.1.1 - FIXED",
         timestamp: new Date().toISOString(),
         userAgent: navigator.userAgent,
